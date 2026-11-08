@@ -22,6 +22,7 @@ import os
 import re
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -65,7 +66,7 @@ def load_env():
     env = {}
     path = ROOT / ".env"
     if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
@@ -866,6 +867,10 @@ def setup_adapty():
 
 
 def main():
+    # Legacy Windows consoles cannot encode every character in API errors or user names.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
     init_db()
     threading.Thread(target=setup_adapty, daemon=True).start()
     port = int(ENV.get("PORT", 8080))

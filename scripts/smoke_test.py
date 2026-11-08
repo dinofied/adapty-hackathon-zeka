@@ -38,6 +38,9 @@ def check(cond, what, detail=""):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
     run = secrets.token_hex(3)
     print(f"Smoke test against {BASE} (run {run})")
     s, h = call("GET", "/healthz")

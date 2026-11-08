@@ -1,5 +1,5 @@
 // Minimal service worker: makes the app installable and keeps the shell available offline.
-const CACHE = "lumen-v1";
+const CACHE = "lumen-v2";
 const SHELL = ["/app", "/static/icon-192.png", "/static/icon-512.png"];
 
 self.addEventListener("install", (e) => {

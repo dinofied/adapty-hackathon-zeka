@@ -3,55 +3,117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#14213d">
+<meta name="theme-color" content="#f3efe5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Lumen">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="icon" href="/static/icon-192.png">
 <link id="manifest" rel="manifest" href="/manifest.webmanifest">
-<title>Lumen</title>
+<title>Lumen — your everyday photo studio</title>
 <style>
-  :root { --ink:#14213d; --muted:#5f6b80; --line:#e6e3dc; --bg:#f6f4ef; --card:#fff; --purple:#6720ff; --orange:#c2410c; --good:#15803d; --soft:#f2edff; }
+  :root {
+    --ink:#292d25; --muted:#626658; --line:#d8d4c6; --bg:#f3efe5; --card:#fffcf5;
+    --accent:#45533c; --soft:#e6ebde; --warm:#dfb477;
+    --title:clamp(36px,5vw,58px); --heading:26px; --body:16px; --label:14px; --caption:12px;
+    --small:6px; --medium:12px; --large:20px;
+  }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif; }
-  body { padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); min-height:100vh; }
-  .wrap { max-width:480px; margin:0 auto; padding:16px; }
-  .top { display:flex; align-items:center; gap:10px; padding:6px 0 14px; }
-  .top img { width:36px; height:36px; border-radius:9px; } .top b { font-size:20px; } .top .sp { flex:1; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin-bottom:14px; }
-  .hero { background:linear-gradient(135deg,#6720ff,#c2410c); color:#fff; border:none; }
-  .hero p { color:#f3e9ff; }
-  h1 { font-size:24px; margin:4px 0 6px; } h2 { font-size:18px; margin:0 0 6px; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); font:var(--body)/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  body { padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); min-height:100vh; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23000' opacity='.035' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E"); }
+  * { box-sizing:border-box; }
+  button, input { -webkit-tap-highlight-color:transparent; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+  button:disabled { opacity:.55; cursor:wait; }
+  .wrap { max-width:1140px; margin:0 auto; padding:24px 32px; }
+  .top { display:flex; align-items:center; gap:12px; padding:0 0 22px; border-bottom:1px solid var(--line); margin-bottom:32px; }
+  .brand { font:600 32px/1 Georgia,serif; letter-spacing:-1.5px; }
+  .brand-mark { width:34px; height:34px; color:var(--accent); }
+  .top .sp { flex:1; } .top-note { color:var(--muted); font-size:var(--label); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--medium); padding:24px; margin-bottom:20px; box-shadow:0 4px 0 rgba(64,59,43,.035); }
+  .hero { background:var(--soft); border-color:#cbd4c0; }
+  h1 { font:400 var(--title)/1.08 Georgia,serif; letter-spacing:-1.8px; margin:8px 0 16px; }
+  h2 { font:400 var(--heading)/1.2 Georgia,serif; letter-spacing:-.5px; margin:0 0 10px; }
+  h3 { font-size:var(--body); margin:0 0 4px; }
   p { margin:0 0 10px; color:var(--muted); }
-  label { display:block; font-size:14px; font-weight:600; margin:10px 0 4px; }
-  input { width:100%; font:inherit; padding:12px; border:1px solid var(--line); border-radius:12px; background:#fffdf9; color:var(--ink); }
-  button { font:inherit; cursor:pointer; border:none; border-radius:14px; padding:13px 16px; font-weight:700; width:100%; }
-  .primary { background:var(--purple); color:#fff; } .light { background:#fff; color:var(--purple); } .ghost { background:transparent; color:var(--muted); font-weight:500; padding:8px; }
-  .chip { display:inline-block; font-size:13px; font-weight:700; padding:4px 10px; border-radius:999px; background:#ebe7df; color:var(--muted); }
-  .chip.prem { background:#fff1d6; color:#8a4b00; } .chip.tier { background:var(--soft); color:var(--purple); }
+  .eyebrow { font-size:var(--label); color:var(--accent); margin:0 0 12px; }
+  label { display:block; font-size:var(--label); font-weight:600; margin:12px 0 6px; }
+  input { width:100%; font:inherit; padding:13px; border:1px solid var(--line); border-radius:var(--small); background:var(--card); color:var(--ink); }
+  button { font:600 var(--label)/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; cursor:pointer; border:1px solid transparent; border-radius:var(--small); padding:13px 16px; width:100%; transition:background .18s,transform .18s; }
+  button:hover:not(:disabled) { transform:translateY(-1px); }
+  .primary { background:var(--accent); color:var(--card); } .primary:hover:not(:disabled) { background:#34422d; }
+  .light { background:var(--card); color:var(--accent); border-color:var(--line); }
+  .ghost { background:transparent; color:var(--muted); font-weight:500; padding:8px; }
+  .chip { display:inline-flex; align-items:center; font-size:var(--caption); font-weight:600; padding:4px 10px; border-radius:var(--large); background:#e8e4d8; color:var(--muted); white-space:nowrap; }
+  .chip.prem, .chip.tier { background:var(--soft); color:var(--accent); }
   .row { display:flex; gap:10px; align-items:center; } .row > * { flex:1; }
-  .stats { display:flex; gap:10px; margin:12px 0; } .stats div { flex:1; background:rgba(255,255,255,.16); border-radius:12px; padding:8px 10px; }
-  .stats b { display:block; font-size:22px; } .stats span { font-size:12px; }
-  .list { list-style:none; margin:0; padding:0; } .list li { display:flex; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); font-size:15px; }
-  .list li:last-child { border-bottom:none; } .list .s { color:var(--muted); font-size:13px; }
-  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; }
-  .grid div { aspect-ratio:1; border-radius:10px; background:linear-gradient(135deg,#d9d2ff,#ffd9c2); }
-  .grid div:nth-child(2n) { background:linear-gradient(135deg,#c2e7ff,#e2d4ff); } .grid div:nth-child(3n) { background:linear-gradient(135deg,#ffe3b3,#ffc4c4); }
+  .stats { display:flex; gap:10px; margin:20px 0; padding:16px 0; border-top:1px solid #cbd4c0; border-bottom:1px solid #cbd4c0; } .stats div { flex:1; }
+  .stats b { display:block; font:400 var(--heading)/1.2 Georgia,serif; } .stats span { font-size:var(--caption); color:var(--muted); }
+  .list { list-style:none; margin:0; padding:0; } .list li { display:flex; justify-content:space-between; gap:8px; padding:12px 0; border-bottom:1px solid var(--line); font-size:var(--label); overflow-wrap:anywhere; }
+  .list li:last-child { border-bottom:none; } .list .s { color:var(--muted); font-size:var(--caption); }
   .banner { background:#fff1d6; border:1px solid #f5d48f; color:#5c3a00; border-radius:14px; padding:12px; margin-bottom:14px; font-size:15px; }
   .ok { background:#e6f6ec; border:1px solid #b9e3c8; color:#14532d; border-radius:14px; padding:12px; margin-bottom:14px; font-size:15px; }
   .err { background:#fde8e6; color:#9f1d17; border-radius:12px; padding:10px; margin-top:10px; font-size:14px; }
-  .sheet-bg { position:fixed; inset:0; background:rgba(20,33,61,.45); display:flex; align-items:flex-end; justify-content:center; z-index:10; }
-  .sheet { background:var(--card); width:100%; max-width:480px; border-radius:22px 22px 0 0; padding:20px 16px calc(20px + env(safe-area-inset-bottom)); max-height:92vh; overflow:auto; }
-  .plan { border:2px solid var(--line); border-radius:14px; padding:12px; margin:8px 0; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
-  .plan.on { border-color:var(--purple); background:var(--soft); }
-  .pw-name { font-size:13px; color:var(--muted); }
-  .tiny { font-size:12px; color:var(--muted); text-align:center; margin-top:10px; }
-  code { background:#f1eee6; padding:2px 6px; border-radius:6px; font-size:14px; }
+  .toast { position:fixed; bottom:calc(24px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); max-width:calc(100% - 32px); padding:12px 20px; border-radius:var(--large); background:var(--accent); color:var(--card); box-shadow:0 8px 24px #292d2526; font-size:var(--label); text-align:center; z-index:20; opacity:0; pointer-events:none; }
+  .toast.visible { opacity:1; }
+  .sheet-bg { position:fixed; inset:0; background:rgba(41,45,37,.48); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:10; padding:20px; }
+  .sheet { background:var(--card); width:100%; max-width:480px; border:1px solid var(--line); border-radius:var(--medium); padding:24px; max-height:calc(100dvh - 40px); overflow:auto; box-shadow:0 24px 80px #292d2540; }
+  .sheet h1 { font-size:36px; margin:12px 0; }
+  .sheet-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .close-button { width:36px; height:36px; padding:0; font-size:22px; background:transparent; color:var(--ink); }
+  .plan { border:1px solid var(--line); border-radius:var(--small); padding:14px; margin:8px 0; display:flex; justify-content:space-between; gap:12px; align-items:center; text-align:left; background:transparent; color:var(--ink); }
+  .plan.on { border-color:var(--accent); background:var(--soft); box-shadow:inset 0 0 0 1px var(--accent); }
+  .plan b { font-size:var(--body); } .plan-price { text-align:right; white-space:nowrap; }
+  .tiny { font-size:var(--caption); color:var(--muted); text-align:center; margin-top:12px; }
+  code { background:#e8e4d8; padding:2px 6px; border-radius:var(--small); font-size:var(--label); overflow-wrap:anywhere; }
+  .welcome { display:grid; grid-template-columns:1.1fr .9fr; align-items:center; gap:60px; max-width:940px; margin:56px auto; }
+  .welcome .card { padding:32px; } .welcome-copy { max-width:480px; }
+  .welcome-art { margin:24px 0; max-width:300px; background:var(--card); padding:12px 12px 28px; box-shadow:3px 5px 0 #ded8c9; transform:rotate(-3deg); }
+  .sample-art { width:100%; display:block; aspect-ratio:5/4; }
+  .welcome-art figcaption { font:italic var(--label) Georgia,serif; text-align:center; padding-top:12px; color:var(--muted); }
+  .studio-heading { display:flex; align-items:end; justify-content:space-between; gap:24px; margin-bottom:24px; }
+  .studio-heading h1 { margin:8px 0; } .studio-heading .primary { width:auto; min-width:150px; }
+  .studio-layout { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:28px; align-items:start; }
+  .workspace { min-width:0; } .photo-mat { background:#e8e4d8; padding:28px; border:1px solid var(--line); border-radius:var(--medium); }
+  .photo-print { background:var(--card); padding:12px 12px 28px; box-shadow:0 8px 24px #292d2510; }
+  #photo { display:block; width:100%; height:auto; max-height:420px; object-fit:contain; background:#ded9cc; }
+  .print-label { display:flex; justify-content:space-between; gap:12px; color:var(--muted); font-size:var(--caption); padding-top:12px; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+  .toolbar button { width:auto; flex:1; min-width:120px; }
+  .section-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:28px 0 14px; }
+  .section-heading h2 { margin:0; } .tools { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .tool { text-align:left; padding:18px; min-height:146px; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:var(--medium); display:flex; flex-direction:column; align-items:start; }
+  .tool.active { border-color:var(--accent); background:var(--soft); }
+  .tool-symbol { font:400 28px/1 Georgia,serif; color:var(--accent); margin-bottom:16px; }
+  .tool strong { font-size:var(--body); margin-bottom:6px; } .tool-desc { font-weight:400; color:var(--muted); font-size:var(--label); margin-bottom:12px; }
+  .tool .chip { margin-top:auto; } .editor-status { min-height:25px; margin:12px 0; font-size:var(--label); }
+  .footer { display:flex; justify-content:space-between; gap:16px; border-top:1px solid var(--line); padding:20px 0 0; margin-top:32px; }
+  .footer p { font-size:var(--caption); margin:0; } .footer button { width:auto; padding:0; }
+  .benefits { padding:12px 0; margin:0; list-style:none; } .benefits li { padding:7px 0; font-size:var(--label); }
+  .benefits li::before { content:"✓"; margin-right:10px; color:var(--accent); }
+  .upload { display:none; } body.modal-open { overflow:hidden; }
+  @media (max-width:800px) { .studio-layout { grid-template-columns:minmax(0,1fr); } .sidebar { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .sidebar .hero { grid-column:1/-1; } .welcome { gap:28px; } }
+  @media (max-width:540px) {
+    .wrap { padding:20px 16px; } .top { margin-bottom:24px; } .top-note { display:none; }
+    .welcome { grid-template-columns:1fr; margin:24px auto; gap:16px; } .welcome-art { display:none; }
+    .welcome .card { padding:24px; } .studio-heading { align-items:start; } .studio-heading h1 { font-size:36px; }
+    .studio-heading .primary { min-width:0; max-width:110px; padding:10px; }
+    .photo-mat { padding:16px; } .tools { grid-template-columns:1fr; gap:8px; }
+    .tool { display:grid; grid-template-columns:32px minmax(0,1fr) 90px; align-items:center; column-gap:10px; padding:14px; min-height:0; }
+    .tool-symbol { grid-column:1; grid-row:1/3; margin:0; }
+    .tool strong { grid-column:2; grid-row:1; font-size:var(--label); }
+    .tool-desc { grid-column:2; grid-row:2; font-size:var(--label); margin:0; }
+    .tool .chip { grid-column:3; grid-row:1/3; margin:0; white-space:normal; text-align:center; justify-content:center; }
+    .sidebar { display:block; } .card { padding:20px; }
+    .sheet-bg { padding:12px; } .sheet { padding:20px; max-height:calc(100dvh - 24px); } .sheet h1 { font-size:32px; }
+    .footer { flex-direction:column; align-items:start; } .toolbar button { min-width:100px; }
+  }
+  @media (prefers-reduced-motion:reduce) { button { transition:none; } button:hover:not(:disabled) { transform:none; } }
 </style>
 </head>
 <body>
 <div class="wrap" id="root"><p style="text-align:center;margin-top:40vh">Loading…</p></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -59,6 +121,15 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch { return 
 const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 let token = store.get("lumen_token"), me = null, ref = null, installEvt = null, notice = null;
+let toastTimer;
+let photoImage = null, photoName = "Lumen sample", currentEffect = "original", recipe = null, editorMessage = "", featureBusy = false;
+const tools = [
+  { key:"warm_paper", name:"Warm Paper", description:"Soft colour, a little nostalgia.", symbol:"◒", premium:false, filter:"sepia(0.22) saturate(0.85) contrast(1.04)", vignette:0 },
+  { key:"portrait_glow", name:"Portrait Glow", description:"Gentler contrast. Brighter moments.", symbol:"☼", premium:true, filter:"brightness(1.08) saturate(0.9) contrast(0.94)", vignette:0.12 },
+  { key:"film_noir", name:"Film Noir", description:"Deep shadows, timeless monochrome.", symbol:"◑", premium:true, filter:"grayscale(1) contrast(1.3)", vignette:0.35 }
+];
+const sampleArt = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800"><rect width="1000" height="800" fill="#e7d6b7"/><circle cx="690" cy="230" r="95" fill="#d99562"/><path d="M0 480Q240 210 510 490T1000 420V800H0Z" fill="#a3ad91"/><path d="M0 610Q270 410 520 610T1000 520V800H0Z" fill="#63765d"/><path d="M0 710Q240 580 580 720T1000 650V800H0Z" fill="#3d5144"/></svg>`;
+const premiumActive = () => Boolean(me?.premium_until && Date.parse(me.premium_until) > Date.now());
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; render(); });
@@ -68,7 +139,7 @@ async function api(path, body) {
   if (body !== undefined) { opts.method = "POST"; opts.body = JSON.stringify(body); }
   const res = await fetch(path, opts);
   const data = await res.json().catch(() => ({ error:"Bad response" }));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) { const error = new Error(data.error || res.statusText); error.status = res.status; throw error; }
   return data;
 }
 const inviteLink = () => `${location.origin}/r/${me.code}`;
@@ -76,14 +147,17 @@ const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { day:"nume
 
 async function start() {
   const qref = new URLSearchParams(location.search).get("ref");
+  store.del("lumen_ref");
   if (qref) document.getElementById("manifest").href = `/manifest.webmanifest?ref=${encodeURIComponent(qref)}`;
   if (token) {
     try { me = await api("/api/app/me"); } catch { token = null; store.del("lumen_token"); }
   }
   if (!me) {
-    const saved = store.get("lumen_ref");
-    try { ref = await api(`/api/app/ref${qref || saved ? `?code=${encodeURIComponent(qref || saved)}` : ""}`); } catch { ref = null; }
-    if (ref && ref.code) store.set("lumen_ref", ref.code); else ref = null;
+    if (qref) {
+      try { ref = await api(`/api/app/ref?code=${encodeURIComponent(qref)}`); } catch { ref = null; }
+      const expectedCode = qref.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 20);
+      if (!expectedCode || ref?.code !== expectedCode) ref = null;
+    }
   }
   render();
 }
@@ -97,41 +171,141 @@ function installCard() {
 
 function render() {
   const root = $("root");
-  const head = `<div class="top"><img src="/static/icon-192.png" alt=""><b>Lumen</b><span class="sp"></span>${me ? `<span class="chip ${me.premium_until ? "prem" : ""}">${me.premium_until ? "Premium" : "Free"}</span>` : ""}</div>`;
+  const active = premiumActive();
+  const head = `<header class="top"><svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5"><path d="M18 1v5m0 24v5M1 18h5m24 0h5M6 6l4 4m16 16 4 4M6 30l4-4M26 10l4-4"/></g></svg><span class="brand">lumen</span><span class="top-note">A little light. A little magic.</span><span class="sp"></span>${me ? `<span class="chip ${active ? "prem" : ""}">${active ? "Premium" : "Free studio"}</span>` : ""}</header>`;
   if (!me) {
-    root.innerHTML = head + (ref ? `<div class="banner">🎁 <b>${esc(ref.inviter)}</b> invited you${ref.friend_days ? `. Sign up and get <b>${ref.friend_days} days of Premium</b> free` : ""}.</div>` : "") +
-      `<div class="card"><h1>AI photo editing, in a tap</h1><p>Create your account to start editing.</p>
-        <form id="signup"><label for="n">Name</label><input id="n" required autocomplete="given-name" placeholder="Your name">
+    root.innerHTML = head + (ref ? `<div class="banner"><b>${esc(ref.inviter)}</b> saved you a spot${ref.friend_days ? `. Join and enjoy <b>${ref.friend_days} days of Premium</b>` : ""}.</div>` : "") +
+      `<main class="welcome"><section class="welcome-copy"><p class="eyebrow">Your everyday photo studio</p><h1>Ordinary moments.<br>Beautifully yours.</h1><p>A softer light, a cinematic mood, a photo worth keeping. Make a little space for creativity.</p>
+        <figure class="welcome-art">${sampleArt.replace("<svg ", '<svg class="sample-art" role="img" aria-label="Illustrated landscape sample" ')}<figcaption>A little study in light — Lumen sample</figcaption></figure>
+        <p class="tiny" style="text-align:left">Local photo effects. Your images stay on this device.</p></section>
+      <section><div class="card"><p class="eyebrow">Make yourself at home</p><h2>Your studio starts here.</h2><p>Create an account, or use the same email to return. Demo sign-in; no email verification.</p>
+        <form id="signup"><label for="n">Name</label><input id="n" required maxlength="40" autocomplete="given-name" placeholder="Your name">
         <label for="e">Email</label><input id="e" type="email" required autocomplete="email" placeholder="you@example.com">
-        <div style="margin-top:14px"><button class="primary">Create account</button></div></form><div id="msg"></div></div>` + installCard() +
-      `<p class="tiny">Hackathon demo: purchases are simulated. Built on Adapty.</p>`;
+        <div style="margin-top:20px"><button class="primary">Enter my studio</button></div></form><div id="msg" role="status" aria-live="polite"></div></div>${installCard()}</section></main>
+      <footer class="footer"><p>Made for moments, not perfection.</p><p>Hackathon demo · subscriptions are simulated · powered by Adapty</p></footer>`;
     $("signup").addEventListener("submit", signup);
   } else {
     const inv = me.invited || [];
     const paidN = me.referrals_paid || 0;
-    root.innerHTML = head + (notice ? `<div class="ok">${notice}</div>` : "") +
-      `<div class="card"><h2>Hi, ${esc(me.name)}</h2>
-        <p>${me.premium_until ? `Premium until <b>${fmtDate(me.premium_until)}</b>.` : "You’re on the free plan."}${me.invited_by ? ` Invited by ${esc(me.invited_by)}.` : ""}</p>
-        <div class="grid"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-        <div style="margin-top:12px"><button class="primary" id="upgrade">${me.paid ? "Change plan" : "Go Premium"}</button></div></div>
-      <div class="card hero"><h2>Invite friends, get Premium</h2>
+    if (!active && recipe?.premium) { recipe = null; currentEffect = "original"; }
+    root.innerHTML = head + (notice ? `<div class="ok" role="status">${notice}</div>` : "") +
+      `<main><section class="studio-heading"><div><p class="eyebrow">Welcome back, ${esc(me.name)}</p><h1>A fresh perspective.</h1>
+        <p>${active ? `Your Premium studio, until ${fmtDate(me.premium_until)}.` : "One photo. A whole new feeling."}</p></div>
+        <button class="primary" id="upgrade">${active ? "View plans" : "Explore Premium"}</button></section>
+      <div class="studio-layout"><section class="workspace" aria-label="Photo studio">
+        <div class="photo-mat"><div class="photo-print"><canvas id="photo" width="1000" height="800" role="img" aria-label="Your photo preview"></canvas>
+          <div class="print-label"><span id="photo-name">${esc(photoName)}</span><span id="effect-name">${esc(tools.find((t) => t.key === currentEffect)?.name || "Original")}</span></div></div>
+          <div class="toolbar"><button class="light" id="upload">Choose a photo</button><button class="light" id="reset-photo">Reset edit</button></div>
+          <input class="upload" id="photo-file" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose a JPEG, PNG or WebP photo">
+        </div>
+        <div class="section-heading"><h2>Find your mood.</h2><span class="chip">Local effects</span></div>
+        <div class="tools">${tools.map((t) => `<button class="tool ${currentEffect === t.key ? "active" : ""}" data-feature="${t.key}" aria-pressed="${currentEffect === t.key}" ${featureBusy ? "disabled" : ""}>
+          <span class="tool-symbol" aria-hidden="true">${t.symbol}</span><strong>${t.name}</strong><span class="tool-desc">${t.description}</span><span class="chip">${t.premium ? active ? "Unlocked" : "Premium · locked" : "Always free"}</span></button>`).join("")}</div>
+        <p class="editor-status" id="editor-status" role="status" aria-live="polite">${esc(editorMessage || "Try the illustrated sample, or choose your own photo. Nothing is uploaded.")}</p>
+        <div class="toolbar"><button class="light" id="export-preview">Export preview</button><button class="primary" id="export-full">${active ? "Export full size" : "Full-size export · Premium"}</button></div>
+        <p class="tiny" style="text-align:left">Preview exports: up to 800px. Premium exports: up to 4096px. Photo effects run on your device, not an AI service.</p>
+      </section><aside class="sidebar" aria-label="Referral program"><div class="card hero"><p class="eyebrow">Good things are better shared</p><h2>A little gift of light.</h2>
         <p>${me.offer.friend_days ? `Friends get <b>${me.offer.friend_days} days</b> free.` : ""} ${me.offer.inviter_days ? `You get <b>${me.offer.inviter_days} days</b> when they subscribe.` : ""}</p>
         <div class="stats"><div><b>${me.referrals_made || 0}</b><span>invited</span></div><div><b>${paidN}</b><span>subscribed</span></div><div><b>${esc(me.tier)}</b><span>tier</span></div></div>
         <button class="light" id="share">Refer a friend</button>
         <p style="margin:10px 0 0;font-size:13px">Your code: <b>${esc(me.code)}</b></p></div>
       <div class="card"><h2>Your invites</h2>${inv.length ? `<ul class="list">${inv.map((i) => `<li><span>${esc(i.name)}<br><span class="s">${i.via ? "via " + esc(i.via) : "joined"}</span></span></li>`).join("")}</ul>` : (me.referrals_made ? `<p>${me.referrals_made} friend(s) joined.</p>` : "<p>No invites yet. Share your link!</p>")}</div>
-      ${me.reward_days || me.credit_days ? `<div class="card"><h2>Rewards</h2><ul class="list">
+      ${me.reward_days || me.credit_days ? `<div class="card"><h2>Your rewards</h2><ul class="list">
         ${me.reward_days ? `<li><span>Premium earned from referrals</span><b>${me.reward_days} days</b></li>` : ""}
-        ${me.credit_days ? `<li><span>Credit, added after your current subscription<br><span class="s">you already pay, so Adapty keeps your subscription as is</span></span><b>${me.credit_days} days</b></li>` : ""}
+        ${me.credit_days ? `<li><span>Recorded credit<br><span class="s">Automatic redemption is not available in this demo.</span></span><b>${me.credit_days} days</b></li>` : ""}
         </ul></div>` : ""}
-      ${installCard()}
-      <button class="ghost" id="signout">Sign out (for testing)</button>
-      <p class="tiny">Hackathon demo · ${me.mode === "live" ? "connected to Adapty" : "offline mock"} · purchases are simulated</p>`;
+      ${installCard()}</aside></div></main>
+      <footer class="footer"><p>Lumen studio · ${me.mode === "live" ? "live Adapty sandbox" : "offline mock"} · purchases are simulated</p><button class="ghost" id="signout">Sign out</button></footer>`;
     $("share").addEventListener("click", share);
-    $("upgrade").addEventListener("click", openPaywall);
+    $("upgrade").addEventListener("click", () => openPaywall());
+    $("upload").addEventListener("click", () => $("photo-file").click());
+    $("photo-file").addEventListener("change", loadPhoto);
+    $("reset-photo").addEventListener("click", () => { recipe = null; currentEffect = "original"; editorMessage = "Back to your original. Nothing lost."; render(); });
+    document.querySelectorAll("[data-feature]").forEach((button) => button.addEventListener("click", () => useFeature(button.dataset.feature)));
+    $("export-preview").addEventListener("click", () => exportPhoto(800));
+    $("export-full").addEventListener("click", () => useFeature("export_full"));
+    if (photoImage) drawPhoto($("photo"), 1600);
+    else loadSample();
     $("signout").addEventListener("click", () => { if (confirm("Sign out? This phone will forget the account.")) { store.del("lumen_token"); store.del("lumen_ref"); location.href = "/app"; } });
   }
   const ib = $("install"); if (ib) ib.addEventListener("click", async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; render(); });
+}
+
+function loadSample() {
+  const image = new Image();
+  image.onload = () => { if (!photoImage) { photoImage = image; if ($("photo")) drawPhoto($("photo"), 1600); } };
+  image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sampleArt);
+}
+
+function setEditorMessage(message) {
+  editorMessage = message;
+  if ($("editor-status")) $("editor-status").textContent = message;
+}
+
+function loadPhoto(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024) {
+    setEditorMessage("Choose a JPEG, PNG or WebP photo smaller than 20 MB."); return;
+  }
+  const url = URL.createObjectURL(file), image = new Image();
+  image.onload = () => {
+    URL.revokeObjectURL(url);
+    if (image.naturalWidth * image.naturalHeight > 60000000) { setEditorMessage("This photo is too large. Choose one under 60 megapixels."); return; }
+    photoImage = image; photoName = file.name; recipe = null; currentEffect = "original";
+    setEditorMessage("Your photo is ready. Pick a mood."); render();
+  };
+  image.onerror = () => { URL.revokeObjectURL(url); setEditorMessage("This photo could not be opened. Try another file."); };
+  image.src = url;
+}
+
+function drawPhoto(canvas, maxSize) {
+  if (!photoImage) return;
+  const scale = Math.min(1, maxSize / Math.max(photoImage.naturalWidth, photoImage.naturalHeight));
+  canvas.width = Math.max(1, Math.round(photoImage.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(photoImage.naturalHeight * scale));
+  const ctx = canvas.getContext("2d");
+  ctx.filter = recipe?.filter || "none";
+  ctx.drawImage(photoImage, 0, 0, canvas.width, canvas.height);
+  ctx.filter = "none";
+  if (recipe?.vignette) {
+    const radius = Math.max(canvas.width, canvas.height) * .7;
+    const shade = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, radius * .25, canvas.width / 2, canvas.height / 2, radius);
+    shade.addColorStop(0, "transparent"); shade.addColorStop(1, `rgba(0,0,0,${recipe.vignette})`);
+    ctx.fillStyle = shade; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+async function useFeature(key) {
+  if (featureBusy) return;
+  const tool = tools.find((t) => t.key === key);
+  const name = tool?.name || "Full-size export";
+  if ((tool?.premium || key === "export_full") && !premiumActive()) { await openPaywall(name); return; }
+  featureBusy = true;
+  try {
+    if (key === "export_full") { exportPhoto(4096); }
+    else if (tool) { recipe = tool; currentEffect = key; editorMessage = `${name} applied. Your original is safe.`; render(); }
+  } catch (err) {
+    setEditorMessage(err.message);
+  } finally {
+    featureBusy = false;
+    document.querySelectorAll("[data-feature]").forEach((button) => { button.disabled = false; });
+  }
+}
+
+function exportPhoto(maxSize) {
+  if (!photoImage) { setEditorMessage("Your photo is still loading. Try again in a moment."); return; }
+  if (recipe?.premium && !premiumActive()) { recipe = null; currentEffect = "original"; render(); openPaywall("Premium effects"); return; }
+  const canvas = document.createElement("canvas");
+  drawPhoto(canvas, maxSize);
+  canvas.toBlob((blob) => {
+    if (!blob) { setEditorMessage("Export failed. Try another photo."); return; }
+    const link = document.createElement("a"), url = URL.createObjectURL(blob);
+    link.href = url; link.download = `lumen-${currentEffect}-${canvas.width}x${canvas.height}.jpg`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setEditorMessage(`Exported ${canvas.width} × ${canvas.height}. A little moment to keep.`);
+  }, "image/jpeg", .94);
 }
 
 async function deviceInfo() {
@@ -155,55 +329,120 @@ async function signup(e) {
     notice = r.existing ? `Welcome back, ${esc(me.name)}! (found your account in Adapty)`
       : r.referred_by ? `🎉 Welcome! ${esc(r.referred_by)} invited you.${(r.actions || []).filter((a) => a.to === me.name).map((a) => ` You got ${esc(a.detail)}.`).join("")}` : "Welcome to Lumen!";
     render();
-  } catch (err) { $("msg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; btn.textContent = "Create account"; }
+  } catch (err) { $("msg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; btn.textContent = "Enter my studio"; }
 }
 
 async function share() {
   const url = inviteLink();
-  const text = `Join me on Lumen, the AI photo editor.${me.offer.friend_days ? ` You get ${me.offer.friend_days} days of Premium free.` : ""}`;
-  if (navigator.share) {
-    try { await navigator.share({ title:"Lumen", text, url }); api("/api/app/share", { channel:"share-sheet" }).catch(() => {}); notice = "Invite sent!"; }
-    catch (err) { if (err.name !== "AbortError") notice = esc(err.message); }
-  } else {
-    try { await navigator.clipboard.writeText(`${text} ${url}`); notice = `Link copied: <code>${esc(url)}</code>`; api("/api/app/share", { channel:"copy-link" }).catch(() => {}); }
-    catch { notice = `Share this link: <code>${esc(url)}</code>`; }
+  const button = $("share"); button.disabled = true;
+  try {
+    const mobile = isIOS || /android/i.test(navigator.userAgent) || matchMedia("(max-width:800px)").matches;
+    if (mobile && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title:"Lumen", url });
+        api("/api/app/share", { channel:"share-sheet" }).catch(() => {});
+        return;
+      } catch (err) {
+        if (err.name === "AbortError") return;
+      }
+    }
+    try { await navigator.clipboard.writeText(url); }
+    catch {
+      const input = document.createElement("textarea");
+      input.value = url; input.readOnly = true;
+      input.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+      const previousFocus = document.activeElement;
+      document.body.appendChild(input);
+      try {
+        input.focus({ preventScroll:true }); input.select(); input.setSelectionRange(0, url.length);
+        if (!document.execCommand("copy")) throw new Error("Clipboard unavailable");
+      } finally { input.remove(); previousFocus?.focus({ preventScroll:true }); }
+    }
+    showToast("Link copied to clipboard!");
+    api("/api/app/share", { channel:"copy-link" }).catch(() => {});
+  } catch {
+    showToast("Could not copy the link. Please allow clipboard access and try again.");
+  } finally {
+    button.disabled = false;
   }
-  render();
 }
 
-async function openPaywall() {
+function showToast(message) {
+  clearTimeout(toastTimer);
+  const bubble = $("toast");
+  bubble.textContent = message; bubble.classList.add("visible");
+  toastTimer = setTimeout(() => { bubble.classList.remove("visible"); bubble.textContent = ""; }, 3000);
+}
+
+async function openPaywall(featureName = "") {
+  if (document.querySelector(".sheet-bg")) return;
+  const previousFocus = document.activeElement;
   const bg = document.createElement("div"); bg.className = "sheet-bg";
-  bg.innerHTML = `<div class="sheet"><p style="text-align:center">Loading offer from Adapty…</p></div>`;
+  bg.innerHTML = `<section class="sheet" role="dialog" aria-modal="true" aria-label="Lumen Premium" tabindex="-1"><div class="sheet-head"><span class="eyebrow">Lumen Premium</span><button class="close-button" aria-label="Close paywall">×</button></div><p role="status">Finding your studio offer…</p></section>`;
+  const close = () => { bg.remove(); document.body.classList.remove("modal-open"); if (previousFocus?.isConnected) previousFocus.focus(); else $("upgrade")?.focus(); };
   document.body.appendChild(bg);
-  bg.addEventListener("click", (e) => { if (e.target === bg) bg.remove(); });
+  document.body.classList.add("modal-open");
+  bg.querySelector(".close-button").addEventListener("click", close);
+  bg.querySelector(".sheet").focus();
+  let processing = false;
+  bg.addEventListener("click", (e) => { if (e.target === bg && !processing) close(); });
+  bg.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !processing) close();
+    if (e.key === "Tab") {
+      const focusable = [...bg.querySelectorAll("button:not(:disabled), a[href]")];
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === bg.querySelector(".sheet"))) { e.preventDefault(); last?.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+    }
+  });
   let pw; try { pw = await api("/api/app/paywall"); } catch (err) { pw = { error:err.message }; }
+  if (!bg.isConnected) return;
+  if (pw.error) {
+    bg.querySelector(".sheet").innerHTML = `<div class="sheet-head"><h2>Offer unavailable</h2><button class="close-button" aria-label="Close paywall">×</button></div><p class="err">${esc(typeof pw.error === "string" ? pw.error : "We could not load your Adapty offer. Please try again.")}</p><button class="light" id="close">Back to my studio</button>`;
+    bg.querySelectorAll("button").forEach((button) => button.addEventListener("click", close));
+    bg.querySelector(".close-button").focus(); return;
+  }
   // Copy and plan order come from the paywall's remote config in Adapty; products from the paywall itself.
   const rc = pw.remote_config || {};
   const fallback = [{ key:"monthly", label:"Monthly", price:9.99, days:30 }, { key:"annual", label:"Annual", price:59.99, days:365 }];
-  const products = (pw.products && pw.products.length ? pw.products : fallback);
+  const products = (pw.products && pw.products.length ? pw.products : me.mode === "mock" ? fallback : []);
+  if (!products.length) {
+    bg.querySelector(".sheet").innerHTML = `<h2>No plans available</h2><p>Your Adapty offer has no supported products. Try again later.</p><button class="light" id="close">Back to my studio</button>`;
+    bg.querySelector("#close").addEventListener("click", close); bg.querySelector("#close").focus(); return;
+  }
   let pick = products.some((p) => p.key === rc.highlight) ? rc.highlight : products[0].key;
   const per = (p) => p.days >= 365 ? "year" : "month";
   const draw = () => {
-    bg.querySelector(".sheet").innerHTML = `<h1>${esc(rc.title || "Unlock Premium")}</h1>
-      <p>${esc(rc.subtitle || "Unlimited AI edits, no watermark, every filter.")}</p>
-      ${products.map((p) => `<div class="plan ${pick === p.key ? "on" : ""}" data-p="${esc(p.key)}"><span><b>${esc(p.title || p.label)}</b><br><span class="s" style="color:var(--muted);font-size:14px">$${Number(p.price).toFixed(2)} / ${per(p)}</span></span>${p.key === rc.highlight && rc.badge ? `<span class="chip tier">${esc(rc.badge)}</span>` : ""}</div>`).join("")}
-      <div style="margin-top:12px"><button class="primary" id="buy">${esc(rc.cta || "Subscribe")}</button></div>
-      <button class="ghost" id="close" style="margin-top:6px">Not now</button>
-      <p class="tiny">Paywall chosen by Adapty: <b>${esc(pw.paywall_name || (pw.error ? "unavailable" : "—"))}</b>${pw.ab_test_name ? ` · A/B test: ${esc(pw.ab_test_name)}` : ""}<br>Demo: the purchase is recorded in Adapty as a transaction, no money is charged.</p>`;
-    bg.querySelectorAll(".plan").forEach((el) => el.addEventListener("click", () => { pick = el.dataset.p; draw(); }));
-    bg.querySelector("#close").addEventListener("click", () => bg.remove());
+    const selected = products.find((p) => p.key === pick);
+    bg.querySelector(".sheet").innerHTML = `<div class="sheet-head"><span class="eyebrow" style="margin:0">Your full creative toolkit</span><button class="close-button" aria-label="Close paywall">×</button></div>
+      <h1>${esc(rc.title || "Make room for more.")}</h1>
+      <p>${featureName ? `${esc(featureName)} is part of your Premium studio.` : "Pick your plan. Keep your creative possibilities open."}</p>
+      <div role="group" aria-label="Subscription plans">${products.map((p) => `<button class="plan ${pick === p.key ? "on" : ""}" data-p="${esc(p.key)}" aria-pressed="${pick === p.key}"><span><b>${esc(p.title || p.label)}</b>${p.key === rc.highlight && rc.badge ? `<br><span style="font-size:var(--caption);color:var(--accent)">${esc(rc.badge)}</span>` : ""}</span><span class="plan-price"><b>$${Number(p.price).toFixed(2)}</b><br><span style="font-weight:400">per ${per(p)}</span></span></button>`).join("")}</div>
+      <ul class="benefits"><li>Portrait Glow — softer contrast and brighter colour</li><li>Film Noir — monochrome with cinematic shadows</li><li>Full-size exports — keep detail, up to 4096px</li></ul>
+      <button class="primary" id="buy">${esc(rc.cta || "Unlock my studio")}</button>
+      <p class="tiny" id="billing-note">$${Number(selected.price).toFixed(2)} per ${per(selected)} · demo transaction only.<br>No real payment. No card or store checkout.</p>
+      <div id="purchase-error" role="status" aria-live="polite"></div><button class="ghost" id="close">Keep creating for free</button>
+      <p class="tiny">Offer: ${esc(pw.paywall_name || "Lumen Premium")}${pw.ab_test_name ? ` · ${esc(pw.ab_test_name)}` : ""}</p>`;
+    bg.querySelector(".close-button").addEventListener("click", close);
+    bg.querySelectorAll(".plan").forEach((el) => el.addEventListener("click", () => { pick = el.dataset.p; draw(); bg.querySelector(`[data-p="${pick}"]`).focus(); }));
+    bg.querySelector("#close").addEventListener("click", close);
     bg.querySelector("#buy").addEventListener("click", async (e) => {
-      e.target.disabled = true; e.target.textContent = "Processing…";
+      processing = true;
+      bg.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+      e.target.textContent = "Opening your studio…";
       try { const r = await api("/api/app/purchase", { product:pick }); me = await api("/api/app/me");
-        notice = "You’re subscribed! (demo purchase, recorded in Adapty)" + (r.reward === "pending" && me.invited_by ? ` Adapty will notify us, and ${esc(me.invited_by)} gets rewarded in a few seconds.` : r.actions?.length ? " Your inviter was rewarded." : ""); bg.remove(); render();
-      } catch (err) { e.target.disabled = false; e.target.textContent = rc.cta || "Subscribe"; alert(err.message); }
+        notice = "Your Premium studio is ready. Demo purchase — no charge." + (r.reward === "pending" && me.invited_by ? ` ${esc(me.invited_by)}’s referral reward is pending.` : r.actions?.length ? " Your inviter was rewarded." : "");
+        close(); render(); $("upgrade")?.focus();
+      } catch (err) { bg.querySelectorAll("button").forEach((button) => { button.disabled = false; }); e.target.textContent = rc.cta || "Unlock my studio"; bg.querySelector("#purchase-error").innerHTML = `<p class="err">${esc(err.message)}</p>`; }
+      finally { processing = false; }
     });
   };
   draw();
+  bg.querySelector(".close-button").focus();
 }
 
 start();
-setInterval(async () => { if (token && document.visibilityState === "visible" && !document.querySelector(".sheet-bg")) { try { me = await api("/api/app/me"); render(); } catch {} } }, 8000);
+setInterval(async () => { if (token && !featureBusy && document.visibilityState === "visible" && !document.querySelector(".sheet-bg") && !$("photo-file")?.matches(":focus")) { try { me = await api("/api/app/me"); render(); } catch {} } }, 8000);
 </script>
 </body>
 </html>

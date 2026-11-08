@@ -2,52 +2,95 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#14213d">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3efe5">
 <meta property="og:title" content="{{NAME}} invited you to Lumen">
-<meta property="og:description" content="Install Lumen with this link and you both get Premium.">
+<meta property="og:description" content="A personal invitation to Lumen, your everyday photo studio.">
 <meta property="og:image" content="/static/icon-512.png">
 <link rel="icon" href="/static/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest?ref={{CODE}}">
 <title>{{NAME}} invited you to Lumen</title>
 <style>
-  body { margin:0; background:#f6f4ef; color:#14213d; font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif; display:flex; justify-content:center; padding:24px 16px; }
-  .card { background:#fff; border:1px solid #e6e3dc; border-radius:22px; padding:24px; max-width:420px; width:100%; text-align:center; }
-  img { width:84px; height:84px; border-radius:20px; }
-  h1 { font-size:23px; margin:10px 0 6px; } p { color:#5f6b80; margin:6px 0 14px; }
-  a.btn { display:block; text-decoration:none; padding:14px; border-radius:14px; font-weight:700; margin-top:10px; }
-  .primary { background:#6720ff; color:#fff; } .second { background:#f2edff; color:#6720ff; }
-  .steps { text-align:left; background:#f6f4ef; border-radius:14px; padding:12px 14px; font-size:15px; margin-top:12px; }
-  .steps ol { margin:4px 0 0; padding-left:20px; }
-  .err { background:#fde8e6; color:#9f1d17; border-radius:12px; padding:12px; }
-  .note { font-size:12px; color:#5f6b80; margin-top:18px; } code { background:#f1eee6; padding:1px 6px; border-radius:6px; }
+  :root { --ink:#292d25; --muted:#626658; --line:#d8d4c6; --bg:#f3efe5; --card:#fffcf5; --accent:#45533c; --soft:#e6ebde; --small:6px; --medium:12px; --large:20px; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); min-height:100vh; background:var(--bg); color:var(--ink); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23000' opacity='.035' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E"); }
+  .wrap { max-width:1140px; margin:0 auto; padding:24px 32px; }
+  .top { display:flex; align-items:center; gap:12px; padding-bottom:22px; border-bottom:1px solid var(--line); }
+  .brand { color:var(--ink); text-decoration:none; font:600 32px/1 Georgia,serif; letter-spacing:-1.5px; }
+  .brand-mark { width:34px; height:34px; color:var(--accent); flex-shrink:0; }
+  .top-note { margin-left:auto; color:var(--muted); font-size:14px; }
+  .invitation-layout { max-width:960px; margin:64px auto; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); align-items:center; gap:64px; }
+  .eyebrow { font-size:14px; color:var(--accent); margin:0 0 12px; }
+  h1 { font:400 clamp(40px,5vw,58px)/1.08 Georgia,serif; letter-spacing:-1.8px; margin:0 0 20px; overflow-wrap:anywhere; }
+  h2 { font:400 26px/1.2 Georgia,serif; letter-spacing:-.5px; margin:0 0 14px; }
+  p { color:var(--muted); margin:0 0 16px; }
+  .postcard { max-width:310px; margin:32px 0 0; padding:12px 12px 22px; background:var(--card); transform:rotate(-3deg); box-shadow:3px 5px 0 #ded8c9; }
+  .postcard svg { display:block; width:100%; height:auto; }
+  .postcard figcaption { font:italic 14px Georgia,serif; text-align:center; padding-top:14px; color:var(--muted); }
+  .card { position:relative; background:var(--card); border:1px solid var(--line); border-radius:var(--medium); padding:28px; box-shadow:0 6px 0 #292d2508; min-width:0; }
+  .letter-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:22px; margin-bottom:24px; border-bottom:1px dashed var(--line); }
+  .letter-head p { margin:0; font-size:14px; }
+  .stamp { display:grid; place-items:center; border:1px dashed var(--accent); border-radius:var(--small); width:44px; height:52px; color:var(--accent); font:32px/1 Georgia,serif; flex-shrink:0; }
+  .invitation-code { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:14px 0; margin:20px 0 8px; border-top:1px solid var(--line); color:var(--muted); font-size:14px; }
+  code { background:var(--soft); color:var(--accent); padding:4px 8px; border-radius:var(--small); overflow-wrap:anywhere; }
+  a:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+  a.btn { display:block; text-align:center; text-decoration:none; padding:14px 16px; border:1px solid transparent; border-radius:var(--small); font-size:14px; font-weight:600; margin-top:10px; }
+  .primary { background:var(--accent); color:var(--card); } .primary:hover { background:#34422d; }
+  .second { background:transparent; color:var(--accent); border-color:var(--line) !important; }
+  .steps { text-align:left; border-top:1px solid var(--line); padding-top:16px; font-size:14px; margin-top:16px; color:var(--muted); }
+  .steps ol { margin:8px 0 0; padding-left:20px; } .steps li { padding:3px 0; }
+  .err { background:#fde8e6; color:#9f1d17; border-radius:var(--small); padding:12px; font-size:14px; }
+  .signature { font:italic 16px/1.5 Georgia,serif; color:var(--accent); margin-top:24px; padding-top:20px; border-top:1px dashed var(--line); overflow-wrap:anywhere; }
+  .note { font-size:12px; margin:16px 0 0; }
+  .footer { display:flex; justify-content:space-between; gap:16px; border-top:1px solid var(--line); padding:20px 0 0; }
+  .footer p { font-size:12px; margin:0; }
+  @media (max-width:800px) { .invitation-layout { gap:32px; margin:40px auto; } }
+  @media (max-width:600px) {
+    .wrap { padding:20px 16px; } .top-note { display:none; }
+    .invitation-layout { grid-template-columns:1fr; margin:28px auto; gap:24px; }
+    h1 { font-size:40px; margin-bottom:14px; } .intro > p:last-of-type { margin:0; }
+    .postcard { display:none; } .card { padding:24px; }
+    .letter-head { padding-bottom:16px; margin-bottom:20px; }
+    .footer { flex-direction:column; gap:8px; }
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <img src="/static/icon-512.png" alt="Lumen app icon">
-  <h1>{{NAME}} invited you to Lumen</h1>
-  <p>The AI photo editor. Install with this link and you both get Premium.</p>
-  <div id="cta"></div>
-  <p class="note">Hackathon demo. In production this link is an Adapty Attribution link that opens the App Store or Google Play, and the app reads code <code>{{CODE}}</code> on first launch.</p>
+<div class="wrap">
+  <header class="top"><svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5"><path d="M18 1v5m0 24v5M1 18h5m24 0h5M6 6l4 4m16 16 4 4M6 30l4-4M26 10l4-4"/></g></svg><a class="brand" href="/app" aria-label="Lumen home">lumen</a><span class="top-note">An invitation, just for you.</span></header>
+  <main class="invitation-layout">
+    <section class="intro"><p class="eyebrow">Good things are better shared</p><h1 id="invite-title">{{NAME}} saved you<br>a little light.</h1><p id="invite-intro">A softer colour. A fresh perspective. Your friend thinks you’ll feel right at home in the Lumen photo studio.</p>
+      <figure class="postcard"><svg viewBox="0 0 1000 800" role="img" aria-label="Illustrated landscape on a paper postcard"><rect width="1000" height="800" fill="#e7d6b7"/><circle cx="690" cy="230" r="95" fill="#d99562"/><path d="M0 480Q240 210 510 490T1000 420V800H0Z" fill="#a3ad91"/><path d="M0 610Q270 410 520 610T1000 520V800H0Z" fill="#63765d"/><path d="M0 710Q240 580 580 720T1000 650V800H0Z" fill="#3d5144"/></svg><figcaption>A little study in light — Lumen sample</figcaption></figure>
+    </section>
+    <section class="card" aria-label="Your invitation">
+      <div class="letter-head"><p>A note from <strong>{{NAME}}</strong></p><span class="stamp" aria-hidden="true">☼</span></div>
+      <h2>You’re invited.</h2><p>Make something worth keeping. Join through this invitation to receive the referral benefits available in Lumen.</p>
+      <div class="invitation-code"><span>Your invitation code</span><code>{{CODE}}</code></div>
+      <div id="cta"></div>
+      <p class="signature">From {{NAME}}, with a little light.</p>
+      <p class="note">Your referral is applied when you create a new account through this link. Returning users keep their existing account.</p>
+    </section>
+  </main>
+  <footer class="footer"><p>Made for moments, not perfection.</p><p>Hackathon demo · subscriptions are simulated · powered by Adapty</p></footer>
 </div>
 <script>
 const valid = "{{VALID}}" === "1", code = "{{CODE}}", hasApk = "{{APK}}" === "1";
 const ua = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(ua), android = /android/i.test(ua);
-try { localStorage.setItem("lumen_ref", code); } catch {}
 const app = `/app?ref=${encodeURIComponent(code)}`;
 const cta = document.getElementById("cta");
 if (!valid) {
+  document.getElementById("invite-title").textContent = "This note got lost.";
+  document.getElementById("invite-intro").textContent = "This invitation is no longer available, but there’s still a place for you in the Lumen studio.";
   cta.innerHTML = `<div class="err">This invite link isn’t valid any more.</div><a class="btn second" href="/app">Open Lumen anyway</a>`;
 } else if (android) {
   cta.innerHTML = (hasApk ? `<a class="btn primary" href="/download/lumen.apk">Download the Android app</a>
-      <div class="steps">After downloading: open the file, allow installs from your browser if asked, then open Lumen. Your invite is applied automatically.</div>` : "")
-    + `<a class="btn ${hasApk ? "second" : "primary"}" href="${app}">${hasApk ? "Or use the web app" : "Open Lumen"}</a>`;
+      <div class="steps">After downloading: open the file and allow installs from your browser if asked. To claim this invitation, use the web app link below; the wrapper does not carry the referral code.</div>` : "")
+    + `<a class="btn ${hasApk ? "second" : "primary"}" href="${app}">${hasApk ? "Accept invitation in the web app" : "Accept invitation"}</a>`;
 } else if (ios) {
-  cta.innerHTML = `<a class="btn primary" href="${app}">Open Lumen</a>
+  cta.innerHTML = `<a class="btn primary" href="${app}">Accept invitation</a>
     <div class="steps"><b>To install on iPhone:</b><ol><li>Open Lumen with the button above, in Safari.</li><li>Tap <b>Share</b>, then <b>Add to Home Screen</b>.</li><li>Open Lumen from your home screen. Your invite stays applied.</li></ol></div>`;
 } else {
-  cta.innerHTML = `<a class="btn primary" href="${app}">Open Lumen</a><p style="margin-top:12px">Or open this link on your phone to install the app.</p>`;
+  cta.innerHTML = `<a class="btn primary" href="${app}">Accept invitation</a><p class="note">Or open this link on your phone to install the app.</p>`;
 }
 </script>
 </body>
