@@ -55,6 +55,9 @@ DEFAULT_PROGRAM = {
         {"trigger": "first_payment", "recipient": "inviter", "action": "grant", "days": 14},
         {"trigger": "paid_referrals_reached", "n": 3, "recipient": "inviter", "action": "set_attribute",
          "key": "referral_vip", "value": "yes"},
+        # Milestone bonuses: one-time, replace that friend's regular reward, never blocked by the cap.
+        {"trigger": "paid_referrals_reached", "n": 3, "recipient": "inviter", "action": "grant", "days": 30},
+        {"trigger": "paid_referrals_reached", "n": 5, "recipient": "inviter", "action": "grant", "days": 60},
     ],
     "tiers": [{"name": "bronze", "min_paid": 1}, {"name": "silver", "min_paid": 3}, {"name": "gold", "min_paid": 5}],
     "max_rewarded_referrals": 5,
@@ -309,9 +312,10 @@ def tier_for(paid, tiers):
 
 # ---------- rules engine: acts on Adapty profiles ----------
 
-def apply_reward(target_cuid, target_name, rule, program, reason, is_inviter):
+def apply_reward(target_cuid, target_name, rule, program, reason, is_inviter, bonus=False):
     """Grant premium (an Adapty access level) or write an attribute. Paying inviters get credit days
-    instead of a grant, so their real store subscription stays the one Adapty shows."""
+    instead of a grant, so their real store subscription stays the one Adapty shows.
+    A milestone bonus is never blocked by the cap: it's one-time per milestone, so it can't be farmed."""
     p = profile(target_cuid) or {}
     attrs = p.get("custom_attributes") or {}
     if rule["action"] == "set_attribute":
@@ -319,7 +323,7 @@ def apply_reward(target_cuid, target_name, rule, program, reason, is_inviter):
         detail = f"{rule['key']} = {rule['value']}"
     else:
         rewards = num(attrs, "referral_rewards")
-        if is_inviter and rewards >= program["max_rewarded_referrals"]:
+        if is_inviter and not bonus and rewards >= program["max_rewarded_referrals"]:
             event("blocked", f"{target_name} hit the cap of {program['max_rewarded_referrals']} rewards")
             return None
         days = rule["days"]
@@ -335,11 +339,13 @@ def apply_reward(target_cuid, target_name, rule, program, reason, is_inviter):
             if ok:
                 ADAPTY.update_attributes(target_cuid, update)
             detail = f"+{days} days premium"
+        if bonus:
+            detail += ", one-time bonus"
     event("reward", f"{target_name}: {detail} ({reason})" + ("" if ok else " — Adapty call failed"))
     return {"to": target_name, "detail": detail, "ok": ok}
 
 
-def run_rules(trigger, friend, inviter, program, reason):
+def run_rules(trigger, friend, inviter, program, reason, bonus=False):
     done = []
     for rule in program["rules"]:
         if rule["trigger"] != trigger:
@@ -348,7 +354,8 @@ def run_rules(trigger, friend, inviter, program, reason):
         who = inviter if is_inviter else friend
         if not who:
             continue
-        r = apply_reward(who["cuid"], who["name"], rule, program, reason, is_inviter)
+        r = apply_reward(who["cuid"], who["name"], rule, program, reason, is_inviter,
+                         bonus=bonus and rule["action"] == "grant")
         if r:
             done.append(r)
     return done
@@ -382,11 +389,22 @@ def handle_first_payment(friend_cuid, source):
     friend = {"cuid": friend_cuid, "name": name_of(friend_cuid, fa)}
     inviter = {"cuid": inviter_cuid, "name": name_of(inviter_cuid, ia)}
     event("payment", f"{friend['name']} paid (via {source}); {inviter['name']} now has {paid} paid referral(s), tier “{tier}”")
-    actions = run_rules("first_payment", friend, inviter, program, f"{friend['name']} paid")
-    for rule in program["rules"]:
-        if rule["trigger"] == "paid_referrals_reached" and rule["n"] == paid:
-            actions += run_rules("paid_referrals_reached", friend, inviter, {**program, "rules": [rule]}, f"{paid} paid referrals")
+    # A milestone premium bonus replaces this friend's regular inviter reward (30 days, not 14 + 30).
+    milestones = [r for r in program["rules"] if r["trigger"] == "paid_referrals_reached" and r["n"] == paid]
+    has_bonus = any(r["action"] == "grant" for r in milestones)
+    regular = [r for r in program["rules"]
+               if not (has_bonus and r["recipient"] == "inviter" and r["action"] == "grant")]
+    actions = run_rules("first_payment", friend, inviter, {**program, "rules": regular}, f"{friend['name']} paid")
+    actions += run_rules("paid_referrals_reached", friend, inviter, {**program, "rules": milestones},
+                         f"{paid} paid referrals", bonus=True)
     return actions
+
+
+def next_bonus(paid, program):
+    """The inviter's next milestone bonus, for the app: {"at": 3, "days": 30, "left": 2} or None."""
+    upcoming = sorted((r["n"], r["days"]) for r in program["rules"]
+                      if r["trigger"] == "paid_referrals_reached" and r["action"] == "grant" and r["n"] > paid)
+    return {"at": upcoming[0][0], "days": upcoming[0][1], "left": upcoming[0][0] - int(paid)} if upcoming else None
 
 
 # ---------- user actions ----------
@@ -528,7 +546,8 @@ def app_me(cuid):
         "referrals_made": num(a, "referrals_made"), "referrals_paid": num(a, "referrals_paid"),
         "reward_days": num(a, "referral_reward_days"), "credit_days": num(a, "referral_credit_days"),
         "invited": invited, "premium_until": premium_until(p), "attributes": a,
-        "offer": {"friend_days": friend_days, "inviter_days": inviter_days},
+        "offer": {"friend_days": friend_days, "inviter_days": inviter_days,
+                  "next_bonus": next_bonus(num(a, "referrals_paid"), program)},
         "mode": "mock" if ADAPTY.mock else "live", "platform": a.get("device_platform"),
     }
 

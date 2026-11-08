@@ -41,11 +41,15 @@ The program (`Referral program settings` paywall):
 {"rules": [
    {"trigger": "install", "recipient": "friend", "action": "grant", "days": 7},
    {"trigger": "first_payment", "recipient": "inviter", "action": "grant", "days": 14},
-   {"trigger": "paid_referrals_reached", "n": 3, "recipient": "inviter", "action": "set_attribute", "key": "referral_vip", "value": "yes"}],
+   {"trigger": "paid_referrals_reached", "n": 3, "recipient": "inviter", "action": "set_attribute", "key": "referral_vip", "value": "yes"},
+   {"trigger": "paid_referrals_reached", "n": 3, "recipient": "inviter", "action": "grant", "days": 30},
+   {"trigger": "paid_referrals_reached", "n": 5, "recipient": "inviter", "action": "grant", "days": 60}],
  "tiers": [{"name": "bronze", "min_paid": 1}, {"name": "silver", "min_paid": 3}, {"name": "gold", "min_paid": 5}],
  "max_rewarded_referrals": 5}
 ```
 Triggers: `install`, `first_payment`, `paid_referrals_reached`; actions: `grant` (days 1–365) or `set_attribute` (key ≤ 30 chars, value ≤ 50, not a system key).
+
+A `grant` on `paid_referrals_reached` is a **one-time milestone bonus**: it replaces that friend's regular inviter reward (friend #3 earns 30 days, not 14 + 30) and is never blocked by `max_rewarded_referrals`. This is the code's default program; the program saved in Adapty only changes when someone saves from the dashboard.
 
 ## Custom attributes (registered)
 

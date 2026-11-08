@@ -44,10 +44,10 @@
 **Webhook (`POST /webhooks/adapty`)**: on `subscription_started` / `non_subscription_purchase` / `trial_converted`, run `handle_first_payment(friend)`:
 1. Skip unless friend's `referral_status = referred` and `referral_reward_paid != yes`; then set `referral_reward_paid = yes` (makes it idempotent).
 2. Inviter: `referrals_paid += 1`, `referral_tier` recomputed.
-3. Run `first_payment` rules (default: inviter +14 days) and `paid_referrals_reached` rules (default: `referral_vip = yes` at 3).
+3. Run `first_payment` rules (default: inviter +14 days) and `paid_referrals_reached` rules (default: `referral_vip = yes` at 3, plus one-time bonuses of 30 days at 3 and 60 days at 5). A milestone bonus replaces the regular inviter grant for that friend and is never blocked by the cap.
 A 25-second fallback after each purchase calls the same function if the webhook hasn't (e.g. local servers).
 
-**Rewards**: a `grant` rule extends the `premium` access level from its current end date. If the recipient is an inviter who **already has a store subscription**, the days go to `referral_credit_days` instead, so Adapty keeps showing their real subscription. `referral_rewards` counts grants against the program's cap.
+**Rewards**: a `grant` rule extends the `premium` access level from its current end date. If the recipient is an inviter who **already has a store subscription**, the days go to `referral_credit_days` instead, so Adapty keeps showing their real subscription. `referral_rewards` counts grants against the program's cap; milestone bonuses still count one but always pay out.
 
 **Program (`/api/program`)**: validated JSON `{rules, tiers, max_rewarded_referrals}` stored as the remote config (locale `en`) of the paywall "Referral program settings"; cached 20 s. Editable from the dashboard or directly in Adapty.
 

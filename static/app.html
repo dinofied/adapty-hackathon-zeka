@@ -33,6 +33,7 @@
   .row { display:flex; gap:10px; align-items:center; } .row > * { flex:1; }
   .stats { display:flex; gap:10px; margin:12px 0; } .stats div { flex:1; background:rgba(255,255,255,.16); border-radius:12px; padding:8px 10px; }
   .stats b { display:block; font-size:22px; } .stats span { font-size:12px; }
+  .next { background:rgba(255,255,255,.16); border-radius:12px; padding:10px 12px; margin:0 0 12px; font-size:14px; color:#fff; }
   .list { list-style:none; margin:0; padding:0; } .list li { display:flex; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); font-size:15px; }
   .list li:last-child { border-bottom:none; } .list .s { color:var(--muted); font-size:13px; }
   .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; }
@@ -95,6 +96,16 @@ function installCard() {
   return "";
 }
 
+const ordinal = (n) => n + ({ 1:"st", 2:"nd", 3:"rd" }[n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th");
+
+function nextBonus() {
+  const b = me.offer.next_bonus;
+  if (!b) return "";
+  const instead = me.offer.inviter_days ? ` instead of ${me.offer.inviter_days}` : "";
+  const togo = b.left === 1 ? "Just one more to go!" : `${b.left} more to go.`;
+  return `<div class="next">🎁 Your <b>${ordinal(b.at)} subscribed friend</b> earns you <b>${b.days} days</b> of Premium${instead}. ${togo}</div>`;
+}
+
 function render() {
   const root = $("root");
   const head = `<div class="top"><img src="/static/icon-192.png" alt=""><b>Lumen</b><span class="sp"></span>${me ? `<span class="chip ${me.premium_until ? "prem" : ""}">${me.premium_until ? "Premium" : "Free"}</span>` : ""}</div>`;
@@ -117,6 +128,7 @@ function render() {
       <div class="card hero"><h2>Invite friends, get Premium</h2>
         <p>${me.offer.friend_days ? `Friends get <b>${me.offer.friend_days} days</b> free.` : ""} ${me.offer.inviter_days ? `You get <b>${me.offer.inviter_days} days</b> when they subscribe.` : ""}</p>
         <div class="stats"><div><b>${me.referrals_made || 0}</b><span>invited</span></div><div><b>${paidN}</b><span>subscribed</span></div><div><b>${esc(me.tier)}</b><span>tier</span></div></div>
+        ${nextBonus()}
         <button class="light" id="share">Refer a friend</button>
         <p style="margin:10px 0 0;font-size:13px">Your code: <b>${esc(me.code)}</b></p></div>
       <div class="card"><h2>Your invites</h2>${inv.length ? `<ul class="list">${inv.map((i) => `<li><span>${esc(i.name)}<br><span class="s">${i.via ? "via " + esc(i.via) : "joined"}</span></span></li>`).join("")}</ul>` : (me.referrals_made ? `<p>${me.referrals_made} friend(s) joined.</p>` : "<p>No invites yet. Share your link!</p>")}</div>

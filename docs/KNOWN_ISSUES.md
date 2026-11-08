@@ -45,3 +45,7 @@ Read this before building on the project. Ordered roughly by how likely it is to
 ## Hackathon rules (still apply)
 
 Only demo/synthetic data, no secrets in the public repo, no load testing or scraping of Adapty, and anything pre-existing must be disclosed in the README (none so far: all code was written 7–8 Nov).
+
+## Open product questions
+
+- **Do we want the reward cap at all?** (raised by Tara, 8 Nov.) "Max premium rewards per inviter" (default 5) stops abuse, but every rewarded referral is a new paying customer, so the cap may cost us growth. One-time milestone bonuses already sit outside it. Revisit with real numbers: how many inviters hit the cap, and what their friends are worth compared with the free days given away. Options: raise it, make it per month instead of lifetime, or drop it and rely on the existing checks (no self-referral, one account per email, rewards only on a friend's first payment).

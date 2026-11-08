@@ -86,6 +86,23 @@ def main():
     s, me2 = call("GET", "/api/app/me", token=inv["token"])
     check(me2.get("referrals_paid") == 1, "a second purchase doesn't reward again", me2.get("referrals_paid"))
 
+    # Milestone bonus (default program: 14 days per friend, the 3rd friend 30 days instead of 14).
+    # Mock mode only: live, it would add two more profiles and purchases to the shared sandbox app.
+    if h.get("mode") == "mock":
+        before = me2.get("reward_days") or 0
+        check(me2.get("offer", {}).get("next_bonus", {}).get("at") == 3, "app shows the next bonus", me2.get("offer"))
+        for i in (2, 3):
+            s, f = call("POST", "/api/app/signup", {"name": f"Smoke Friend {i}", "email": f"smoke.friend{i}.{run}@example.com", "ref": code})
+            s, b = call("POST", "/api/app/purchase", {"product": "monthly"}, token=f.get("token"))
+            check(s == 200 and b.get("recorded"), f"friend {i} subscribes", b)
+        s, me3 = call("GET", "/api/app/me", token=inv["token"])
+        check(me3.get("referrals_paid") == 3, "three paid referrals are counted", me3.get("referrals_paid"))
+        check((me3.get("reward_days") or 0) - before == 14 + 30,
+              "3rd friend gives the 30-day bonus instead of 14", me3.get("reward_days"))
+        check(me3.get("offer", {}).get("next_bonus", {}).get("at") == 5, "app moves on to the next bonus", me3.get("offer"))
+    else:
+        print("  skip milestone bonus check (mock mode only)")
+
     print("ALL CHECKS PASSED")
 
 
