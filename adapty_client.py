@@ -50,6 +50,15 @@ PRODUCTS = {
 BY_STORE_ID = {p["store_product_id"]: k for k, p in PRODUCTS.items()}
 BY_STORE_ID.update({"sandbox.monthly": "monthly", "sandbox.annual": "annual"})  # older iOS-only products
 
+# Lumen tokens: Adapty's virtual currency TOKENS keeps every user's balance. Token packs are one-time
+# purchases; they are not subscriptions, so they never count in BY_STORE_ID or has_paid_subscription.
+TOKEN_CURRENCY = "TOKENS"
+TOKEN_PACKS = {
+    "tokens_30": {"store_product_id": "lumen.demo.tokens30", "price": 1.99, "tokens": 30, "label": "30 tokens"},
+    "tokens_100": {"store_product_id": "lumen.demo.tokens100", "price": 4.99, "tokens": 100, "label": "100 tokens"},
+}
+TOKEN_PACK_IDS = {p["store_product_id"] for p in TOKEN_PACKS.values()}
+
 # Remote configs the service writes once to the paywalls, so their copy lives in Adapty.
 DEFAULT_REMOTE_CONFIGS = {
     "Referral welcome (iOS + Android)": {"title": "A gift from your friend", "subtitle": "You were invited, so you get our best plan first.",
@@ -237,14 +246,18 @@ class AdaptyClient:
 
     # ---------- purchases ----------
 
+    @staticmethod
+    def _tx_id(store, now):
+        stamp = f"{int(now.timestamp() * 1000)}{secrets.randbelow(1000):03d}"
+        return f"9{stamp}" if store == "app_store" else f"GPA.{stamp[:4]}-{stamp[4:8]}-{stamp[8:12]}-{stamp[12:]}"
+
     def set_transaction(self, user_id, product_key, variation_id=None, platform="iOS", country="RS"):
         """Record a subscription purchase in Adapty (App Store or Google Play, per the phone). It shows in
         analytics, the event feed and the profile, unlocks the product's access level and fires webhooks."""
         p = PRODUCTS[product_key]
         store = STORES.get(platform, "app_store")
         now = _now()
-        stamp = f"{int(now.timestamp() * 1000)}{secrets.randbelow(1000):03d}"
-        tx_id = f"9{stamp}" if store == "app_store" else f"GPA.{stamp[:4]}-{stamp[4:8]}-{stamp[8:12]}-{stamp[12:]}"
+        tx_id = self._tx_id(store, now)
         body = {
             "purchase_type": "subscription", "store": store, "environment": "Production",
             "store_product_id": p["store_product_id"], "store_transaction_id": tx_id,
@@ -266,6 +279,68 @@ class AdaptyClient:
         status, data = self._request("POST", "/server-side-api/purchase/set/transaction/", body, user_id=user_id,
                                      platform=platform, note=f"{product_key} ${p['price']} {store}")
         return 200 <= status < 300, data
+
+    def set_token_purchase(self, user_id, pack_key, platform="iOS", country="RS"):
+        """Record a token pack as a one-time purchase in Adapty, so its revenue shows in analytics.
+        It grants no access level; the server credits the tokens separately (see change_tokens)."""
+        p = TOKEN_PACKS[pack_key]
+        store = STORES.get(platform, "app_store")
+        now = _now()
+        tx_id = self._tx_id(store, now)
+        body = {
+            "purchase_type": "one_time_purchase", "store": store, "environment": "Production",
+            "store_product_id": p["store_product_id"], "store_transaction_id": tx_id,
+            "store_original_transaction_id": tx_id, "is_family_shared": False,
+            "price": {"country": country, "currency": "USD", "value": p["price"]},
+            "purchased_at": _iso(now), "variation_id": None, "offer": None, "refunded_at": None,
+            "cancellation_reason": None,
+        }
+        if self.mock:
+            m = self._mock_profiles.setdefault(user_id, {"attrs": {}, "access": [], "subs": [], "revenue": 0.0})
+            m["revenue"] = m.get("revenue", 0.0) + p["price"]
+            self._log("POST", "/server-side-api/purchase/set/transaction/", 200, f"mock: {pack_key} ({store})")
+            return True, {"mock": True, "transaction_id": tx_id}
+        status, data = self._request("POST", "/server-side-api/purchase/set/transaction/", body, user_id=user_id,
+                                     platform=platform, note=f"{pack_key} ${p['price']} {store}")
+        return 200 <= status < 300, {"transaction_id": tx_id, "response": data}
+
+    # ---------- tokens (Adapty virtual currency) ----------
+
+    def token_balance(self, user_id):
+        """(ok, tokens the user can spend). A profile that never had tokens has a balance of 0."""
+        if self.mock:
+            m = self._mock_profiles.get(user_id)
+            self._log("GET", "/server-side-api/vc/balances/", 200 if m else 404, f"mock: {user_id}")
+            return (True, m.get("tokens", 0)) if m is not None else (False, "profile_not_found")
+        status, data = self._request("GET", "/server-side-api/vc/balances/", user_id=user_id)
+        if 200 <= status < 300:
+            row = next((b for b in self._data(data) or [] if b.get("code") == TOKEN_CURRENCY), {})
+            return True, int(row.get("available", row.get("balance", 0)) or 0)
+        return False, (data.get("error_code") if isinstance(data, dict) else None) or f"http_{status}"
+
+    def change_tokens(self, user_id, amount, reason, item=None):
+        """Credit (amount > 0) or spend (amount < 0) tokens in one atomic Adapty transaction.
+        (True, new balance) or (False, error code), e.g. "insufficient_balance", where nothing changed."""
+        meta = {"reason": str(reason)[:200]}
+        if item:
+            meta["item"] = str(item)[:200]
+        path = "/server-side-api/vc/transactions/"
+        if self.mock:
+            m = self._mock_profiles.get(user_id)
+            if m is None:
+                return False, "profile_not_found"
+            if m.get("tokens", 0) + amount < 0:
+                self._log("POST", path, 400, f"mock: insufficient_balance for {amount:+d} {TOKEN_CURRENCY}")
+                return False, "insufficient_balance"
+            m["tokens"] = m.get("tokens", 0) + amount
+            self._log("POST", path, 200, f"mock: {amount:+d} {TOKEN_CURRENCY} ({reason})")
+            return True, m["tokens"]
+        body = {"items": [{"currency_code": TOKEN_CURRENCY, "amount": int(amount)}], "metadata": meta}
+        status, data = self._request("POST", path, body, user_id=user_id, note=f"{amount:+d} {TOKEN_CURRENCY} {reason}")
+        if 200 <= status < 300:
+            row = next((b for b in (data or {}).get("balances") or [] if b.get("code") == TOKEN_CURRENCY), {})
+            return True, int(row.get("available", row.get("balance", 0)) or 0)
+        return False, (data.get("error_code") if isinstance(data, dict) else None) or f"http_{status}"
 
     # ---------- paywalls (Adapty decides) ----------
 

@@ -89,6 +89,22 @@ def main():
     s, me2 = call("GET", "/api/app/me", token=inv["token"])
     check(me2.get("referrals_paid") == 1, "a second purchase doesn't reward again", me2.get("referrals_paid"))
 
+    # Lumen tokens (Adapty virtual currency). Skipped when the Adapty app has no TOKENS currency.
+    s, nt = call("POST", "/api/app/signup", {"name": "Smoke Tokens", "email": f"smoke.tokens.{run}@example.com"})
+    s, mt = call("GET", "/api/app/me", token=nt.get("token"))
+    if not mt.get("tokens"):
+        print("  skip tokens are not set up in this Adapty app")
+    else:
+        bal = mt["tokens"]["balance"]
+        check(bal > 0, "a new user gets welcome tokens", mt["tokens"])
+        s, sp = call("POST", "/api/app/tokens/spend", {"item": "portrait_glow"}, token=nt["token"])
+        check(s == 200 and sp.get("balance") == bal - 3, "spending tokens on Portrait Glow", sp)
+        s, sp = call("POST", "/api/app/tokens/spend", {"item": "nothing"}, token=nt["token"])
+        check(s == 400, "unknown items can't be bought with tokens", sp)
+        if h.get("mode") == "mock":  # a pack is a real (demo) purchase in Adapty: mock only
+            s, b = call("POST", "/api/app/tokens/buy", {"pack": "tokens_30"}, token=nt["token"])
+            check(s == 200 and b.get("balance") == bal - 3 + 30, "a token pack adds 30 tokens", b)
+
     print("ALL CHECKS PASSED")
 
 

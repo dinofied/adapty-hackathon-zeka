@@ -312,6 +312,91 @@ class RewardTests(unittest.TestCase):
         self.assertEqual(premium_days_left(self.andre), 14)
 
 
+# ---------------------------------------------------------------- Lumen tokens (Adapty virtual currency)
+
+class TokenTests(unittest.TestCase):
+    def setUp(self):
+        fresh_state(self)
+        server._tokens_off["until"] = 0.0
+        join("Andre", "andre@example.com")
+        self.andre = cuid("andre@example.com")
+
+    def balance(self, c):
+        return server.token_wallet(c)["balance"]
+
+    def test_new_user_gets_welcome_tokens_once(self):
+        self.assertEqual(self.balance(self.andre), server.WELCOME_TOKENS)
+        join("Andre", "ANDRE@example.com")  # signing in again
+        self.assertEqual(self.balance(self.andre), server.WELCOME_TOKENS)
+
+    def test_spending_takes_the_price_and_never_goes_below_zero(self):
+        r = server.spend_tokens(self.andre, "film_noir")
+        self.assertEqual((r["spent"], r["balance"]), (5, 5))
+        with self.assertRaises(server.Problem):
+            server.spend_tokens(self.andre, "export_full")  # costs 8, has 5
+        self.assertEqual(self.balance(self.andre), 5, "a refused spend changes nothing")
+        with self.assertRaises(server.Problem):
+            server.spend_tokens(self.andre, "free_lunch")
+
+    def test_premium_users_are_not_charged(self):
+        server.purchase(self.andre, "monthly")
+        self.assertEqual(server.spend_tokens(self.andre, "film_noir")["spent"], 0)
+        self.assertEqual(self.balance(self.andre), server.WELCOME_TOKENS)
+
+    def test_token_pack_adds_tokens_but_is_not_a_subscription(self):
+        r = server.buy_tokens(self.andre, "tokens_30")
+        self.assertEqual(r["balance"], server.WELCOME_TOKENS + 30)
+        self.assertFalse(server.ADAPTY.has_paid_subscription(server.profile(self.andre)))
+        self.assertIsNone(server.premium_until(server.profile(self.andre)))
+        with self.assertRaises(server.Problem):
+            server.buy_tokens(self.andre, "tokens_1000000")
+
+    def test_token_pack_does_not_count_as_a_referral_payment(self):
+        join("Mila", "mila@example.com", ref=code("Andre", "andre@example.com"))
+        server.buy_tokens(cuid("mila@example.com"), "tokens_30")
+        self.assertEqual(server.num(attrs(self.andre), "referrals_paid"), 0)
+
+    def test_token_rules_are_validated(self):
+        rule = {"trigger": "first_payment", "recipient": "inviter", "action": "tokens"}
+        for bad in (0, 1001):
+            with self.assertRaises(server.Problem):
+                server.validate_program({**server.DEFAULT_PROGRAM, "rules": [{**rule, "amount": bad}]})
+        p = server.validate_program({**server.DEFAULT_PROGRAM, "rules": [{**rule, "amount": 25}]})
+        self.assertEqual(p["rules"][0]["amount"], 25)
+
+    def test_token_rule_rewards_the_inviter_within_the_cap(self):
+        server.save_program({**server.DEFAULT_PROGRAM, "max_rewarded_referrals": 1, "rules": [
+            {"trigger": "first_payment", "recipient": "inviter", "action": "tokens", "amount": 25}]})
+        for n in (1, 2):
+            join("Friend", f"friend{n}@example.com", ref=code("Andre", "andre@example.com"))
+            server.purchase(cuid(f"friend{n}@example.com"), "monthly")
+        self.assertEqual(self.balance(self.andre), server.WELCOME_TOKENS + 25, "the cap allows one reward")
+        self.assertEqual(attrs(self.andre)["referrals_paid"], 2)
+
+    def test_one_users_404_never_switches_tokens_off_for_everyone(self):
+        server.tokens_unavailable("http_404")
+        server.tokens_unavailable("http_403")
+        self.assertTrue(server.tokens_on())
+        self.assertEqual(server.token_wallet("lumen_ffffffff")["balance"], 0, "no balance yet reads as 0")
+        self.assertTrue(server.tokens_on())
+
+    def test_paid_but_not_credited_pack_is_logged_as_owed(self):
+        server.ADAPTY.change_tokens = lambda *a, **k: (False, "rate_limited")
+        with self.assertRaises(server.Problem):
+            server.buy_tokens(self.andre, "tokens_30")
+        with server.db() as c:
+            owed = c.execute("SELECT text FROM events WHERE kind = 'owed'").fetchall()
+        self.assertEqual(len(owed), 1)
+        self.assertIn("transaction", owed[0][0])
+        self.assertIn("30 tokens", owed[0][0])
+
+    def test_tokens_switch_off_when_adapty_has_no_currency(self):
+        server.tokens_unavailable("unknown_currency")
+        self.assertIsNone(server.token_wallet(self.andre))
+        server._tokens_off["until"] = 0.0
+        self.assertIsNotNone(server.token_wallet(self.andre))
+
+
 # ---------------------------------------------------------------- webhook over HTTP
 
 class WebhookTests(unittest.TestCase):
@@ -367,6 +452,13 @@ class WebhookTests(unittest.TestCase):
         self.assertEqual(self.post("/webhooks/adapty", event, auth=self.SECRET), 200)  # Adapty retries
         time.sleep(0.3)
         self.assertEqual(attrs(self.andre)["referrals_paid"], 1)
+
+    def test_token_pack_purchase_event_does_not_reward(self):
+        event = {"event_type": "non_subscription_purchase", "customer_user_id": self.mila,
+                 "event_properties": {"vendor_product_id": "lumen.demo.tokens30"}}
+        self.assertEqual(self.post("/webhooks/adapty", event, auth=self.SECRET), 200)
+        time.sleep(0.3)
+        self.assertEqual(server.num(attrs(self.andre), "referrals_paid"), 0)
 
     def test_other_events_do_not_reward(self):
         event = {"event_type": "subscription_renewed", "customer_user_id": self.mila}

@@ -55,6 +55,13 @@ A 25-second fallback after each purchase calls the same function if the webhook 
 
 **Rewards**: a `grant` rule extends the `premium` access level from its current end date. If the recipient is an inviter who **already has a store subscription**, the days go to `referral_credit_days` instead, so Adapty keeps showing their real subscription. `referral_rewards` counts grants against the program's cap.
 
+**Lumen tokens (Adapty virtual currency `TOKENS`)**: Adapty keeps every balance; the server only reads it (`GET /server-side-api/vc/balances/`) and changes it (`POST /server-side-api/vc/transactions/`, atomic, refuses to go below zero, `metadata.reason` = `welcome` / `spend` / `token_pack` / `referral_reward`).
+- New users get 10 welcome tokens once, in the branch of sign-up that creates the Adapty profile.
+- Free users spend tokens instead of subscribing (`POST /api/app/tokens/spend`): Portrait Glow 3, Film Noir 5 (both for the current photo only), one full-size export 8. Premium users are never charged.
+- Token packs (`POST /api/app/tokens/buy`): 30 for $1.99, 100 for $4.99, recorded as a `one_time_purchase` transaction, then credited by the server. A pack is not a subscription and does **not** count as a referred friend's first payment (the webhook skips `vendor_product_id`s of packs).
+- Rule action `tokens` ("Give N Lumen tokens"): referral rewards in tokens; inviter token rewards count against the same cap as premium grants.
+- If the Adapty app has no `TOKENS` currency or no virtual currency API, tokens switch off for 5 minutes at a time and the app is subscription-only, as before.
+
 **Program (`/api/program`)**: validated JSON `{rules, tiers, max_rewarded_referrals}` stored as the remote config (locale `en`) of the paywall "Referral program settings"; cached 20 s. Editable from the dashboard or directly in Adapty.
 
 ## What the dashboard reads

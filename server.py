@@ -30,7 +30,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
 
-from adapty_client import CALL_LOG, PRODUCTS as ADAPTY_PRODUCTS, AdaptyClient, device_from_ua
+from adapty_client import (CALL_LOG, PRODUCTS as ADAPTY_PRODUCTS, TOKEN_PACK_IDS, TOKEN_PACKS, AdaptyClient,
+                           device_from_ua)
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
@@ -45,7 +46,16 @@ TRIGGERS = {
     "paid_referrals_reached": "Inviter reaches N paid referrals",
 }
 RECIPIENTS = {"friend": "Friend (new user)", "inviter": "Inviter"}
-ACTIONS = {"grant": "Grant premium for N days", "set_attribute": "Set an Adapty attribute"}
+ACTIONS = {"grant": "Grant premium for N days", "tokens": "Give N Lumen tokens", "set_attribute": "Set an Adapty attribute"}
+
+# Lumen tokens (Adapty virtual currency TOKENS): free users can pay for one Premium effect on one photo,
+# or one full-size export, instead of subscribing. Premium users never pay tokens.
+WELCOME_TOKENS = 10
+TOKEN_ITEMS = {
+    "portrait_glow": {"name": "Portrait Glow", "tokens": 3},
+    "film_noir": {"name": "Film Noir", "tokens": 5},
+    "export_full": {"name": "Full-size export", "tokens": 8},
+}
 SYSTEM_KEYS = ("referral_code", "referral_status", "referred_by", "referrals_made", "referrals_paid", "referral_tier",
                "referral_credit_days", "referral_reward_days", "referral_rewards", "referral_reward_paid",
                "links_shared", "link_opens", "last_referred", "display_name", "device_platform")
@@ -265,6 +275,10 @@ def validate_program(p):
             rule["days"] = int(r.get("days") or 0)
             if not 1 <= rule["days"] <= 365:
                 raise Problem("Premium days must be between 1 and 365.")
+        elif act == "tokens":
+            rule["amount"] = int(r.get("amount") or 0)
+            if not 1 <= rule["amount"] <= 1000:
+                raise Problem("Tokens must be between 1 and 1000.")
         else:
             key, value = str(r.get("key", "")).strip(), str(r.get("value", "")).strip()
             if not re.fullmatch(r"[A-Za-z0-9_.\-]{1,30}", key):
@@ -323,6 +337,15 @@ def apply_reward(target_cuid, target_name, rule, program, reason, is_inviter):
         if is_inviter and rewards >= program["max_rewarded_referrals"]:
             event("blocked", f"{target_name} hit the cap of {program['max_rewarded_referrals']} rewards")
             return None
+        if rule["action"] == "tokens":
+            ok, res = ADAPTY.change_tokens(target_cuid, rule["amount"], "referral_reward")
+            if ok and is_inviter:
+                ADAPTY.update_attributes(target_cuid, {"referral_rewards": rewards + 1})
+            if not ok:
+                tokens_unavailable(res)
+            detail = f"+{rule['amount']} tokens"
+            event("reward", f"{target_name}: {detail} ({reason})" + ("" if ok else " — Adapty call failed"))
+            return {"to": target_name, "detail": detail, "ok": ok}
         days = rule["days"]
         update = {"referral_reward_days": num(attrs, "referral_reward_days") + days}
         if is_inviter:
@@ -427,6 +450,16 @@ def signup(name, email, ref, via, ua, ip, client_device=None):
                  platform=device["platform"], via=via)
     event("install", f"{name} installed on {device['platform']} ({device['device']})"
           + (f" through {inviter['name']}’s link" + (f" via {via}" if via else "") if inviter else ", organic"))
+    # Welcome tokens, once: this branch only runs when Adapty had no profile for this email.
+    if WELCOME_TOKENS and not tokens_on():
+        event("tokens", f"{name} got no welcome tokens: tokens are switched off (Adapty setup), and there is no backfill")
+    elif WELCOME_TOKENS:
+        ok, res = ADAPTY.change_tokens(cuid, WELCOME_TOKENS, "welcome")
+        if ok:
+            event("tokens", f"{name} got {WELCOME_TOKENS} welcome tokens")
+        else:
+            tokens_unavailable(res)
+            event("tokens", f"{name} got no welcome tokens: Adapty said {res}")
     actions = []
     if inviter:
         program = get_program()
@@ -467,6 +500,83 @@ def purchase(cuid, product):
         threading.Thread(target=fallback, daemon=True).start()
         return {"recorded": True, "reward": "pending", "note": "Adapty's webhook will reward the inviter"}
     return {"recorded": True, "actions": handle_first_payment(cuid, "purchase")}
+
+
+# ---------- Lumen tokens (Adapty virtual currency) ----------
+
+# When the Adapty app has no TOKENS currency or no virtual currency API, the app hides tokens
+# and stays subscription-only; check again every few minutes.
+_tokens_off = {"until": 0.0}
+
+
+def tokens_on():
+    return time.time() >= _tokens_off["until"]
+
+
+def tokens_unavailable(error_code):
+    """Switch tokens off for everyone only on setup errors of the whole Adapty app, never on one
+    user's error (a 404 for one profile must not hide tokens from every other user)."""
+    if error_code in ("feature_not_enabled", "unknown_currency"):
+        if tokens_on():
+            print(f"Lumen tokens are off for 5 minutes: Adapty said {error_code}. See docs/ADAPTY_SETUP.md.", flush=True)
+        _tokens_off["until"] = time.time() + 300
+
+
+def token_wallet(cuid):
+    """What the app needs to show tokens, or None when tokens aren't available."""
+    if not tokens_on():
+        return None
+    ok, balance = ADAPTY.token_balance(cuid)
+    if not ok and balance in ("profile_not_found", "http_404"):
+        ok, balance = True, 0  # a profile that has never held tokens
+    if not ok:
+        tokens_unavailable(balance)
+        return None
+    return {"balance": balance, "prices": {k: v["tokens"] for k, v in TOKEN_ITEMS.items()},
+            "packs": [{"key": k, "label": p["label"], "price": p["price"], "tokens": p["tokens"]} for k, p in TOKEN_PACKS.items()]}
+
+
+def spend_tokens(cuid, item):
+    if item not in TOKEN_ITEMS:
+        raise Problem("Unknown item.")
+    p = profile(cuid)
+    if not p:
+        raise Problem("Not signed in.")
+    name, cost = TOKEN_ITEMS[item]["name"], TOKEN_ITEMS[item]["tokens"]
+    if premium_until(p):  # Premium already includes it
+        return {"spent": 0, "item": item, "balance": (token_wallet(cuid) or {}).get("balance")}
+    ok, res = ADAPTY.change_tokens(cuid, -cost, "spend", item)
+    if not ok:
+        if res == "insufficient_balance":
+            raise Problem(f"{name} costs {cost} tokens. Get more tokens, or go Premium.")
+        tokens_unavailable(res)
+        raise Problem("Adapty didn't accept the token payment. Check the server log.")
+    event("tokens", f"{name_of(cuid, p.get('custom_attributes'))} spent {cost} tokens on {name} (balance {res})")
+    return {"spent": cost, "item": item, "balance": res}
+
+
+def buy_tokens(cuid, pack):
+    if pack not in TOKEN_PACKS:
+        raise Problem("Unknown token pack.")
+    p = profile(cuid)
+    if not p:
+        raise Problem("No such user in Adapty.")
+    attrs = p.get("custom_attributes") or {}
+    platform = attrs.get("device_platform") or person(cuid).get("platform") or "iOS"
+    pk = TOKEN_PACKS[pack]
+    ok, tx = ADAPTY.set_token_purchase(cuid, pack, platform)
+    if not ok:
+        raise Problem("Adapty didn't accept the purchase. Check the server log.")
+    ok, res = ADAPTY.change_tokens(cuid, pk["tokens"], "token_pack", pack)
+    if not ok:
+        tokens_unavailable(res)
+        # Paid but not credited: leave a record so someone can add the tokens by hand in Adapty.
+        event("owed", f"{name_of(cuid, attrs)} ({cuid}) is owed {pk['tokens']} tokens: {pk['label']} was recorded "
+              f"in Adapty (transaction {tx.get('transaction_id')}) but the credit failed ({res})")
+        raise Problem("Your purchase is recorded, but your tokens didn't arrive yet. We've noted it and will add them.")
+    event("purchase", f"{name_of(cuid, attrs)} bought {pk['label']} (${pk['price']:.2f}) on "
+          f"{'Google Play' if platform == 'Android' else 'App Store'}, recorded in Adapty; balance {res}")
+    return {"added": pk["tokens"], "balance": res}
 
 
 def share(cuid, channel):
@@ -531,6 +641,7 @@ def app_me(cuid):
         "invited": invited, "premium_until": premium_until(p), "attributes": a,
         "offer": {"friend_days": friend_days, "inviter_days": inviter_days},
         "mode": "mock" if ADAPTY.mock else "live", "platform": a.get("device_platform"),
+        "tokens": token_wallet(cuid),
     }
 
 
@@ -869,6 +980,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle(lambda: share(self._me(), str(self._body().get("channel", "share"))[:20]))
         if path == "/api/app/purchase":
             return self._handle(lambda: purchase(self._me(), self._body().get("product", "monthly")))
+        if path == "/api/app/tokens/spend":
+            return self._handle(lambda: spend_tokens(self._me(), str(self._body().get("item", ""))))
+        if path == "/api/app/tokens/buy":
+            return self._handle(lambda: buy_tokens(self._me(), str(self._body().get("pack", ""))))
         if self._need_admin():
             return
         routes = {
@@ -901,7 +1016,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "bad authorization"})
         if etype:
             event("webhook", f"Adapty webhook: {etype} for {name_of(cuid) if cuid else 'unknown user'}")
-        if etype in FIRST_PAYMENT_EVENTS and cuid:
+        # A token pack is a one-time purchase too, but it doesn't count as the friend's first payment:
+        # a $1.99 pack shouldn't earn the inviter a Premium reward.
+        product = (body.get("event_properties") or {}).get("vendor_product_id")
+        if etype in FIRST_PAYMENT_EVENTS and cuid and product not in TOKEN_PACK_IDS:
             threading.Thread(target=self._reward_safely, args=(cuid,), daemon=True).start()
         self._send(200, {"ok": True})
 
