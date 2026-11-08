@@ -39,7 +39,7 @@ Read this before building on the project. Ordered roughly by how likely it is to
 
 - **Render free plan sleeps** after 15 minutes idle (first request ~50 s) and wipes the index. Teodor's PC pings `/healthz` every 10 minutes while it's on. The GitHub Actions schedule asks for the same but has run hours apart, so it's only a weak backup; if the PC is off, expect cold starts. Open the site a minute before the demo.
 - **Env vars, logs and the deploy hook are in Teodor's Render account.** Changes there go through him.
-- **The service worker caches the app shell.** It's network-first, but after big `app.html` changes a phone may need a reload or two (or remove the installed app and add it again).
+- **The service worker caches the app shell.** It is network-first; its served version fingerprints the app HTML, launch helper and worker. Invitation launch checks for updates, and controlled app pages reload on activation. Offline/update failures still open the app; web updates are not Android package upgrades.
 - **`localhost:8080` after the local server stops** still shows the cached app shell, and every action fails with "Failed to fetch". Start the server or use the live URL.
 
 ## Hackathon rules (still apply)

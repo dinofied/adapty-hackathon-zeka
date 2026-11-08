@@ -20,14 +20,17 @@ Team Zeka, Adapty Hackathon Belgrade, 7–8 November 2026. Code freeze **Sunday 
 | `server.py` | HTTP server, identity, rules engine, webhook handler, admin API (Python stdlib only) |
 | `adapty_client.py` | Adapty server-side + web API client, device detection, mock mode |
 | `static/app.html` | The phone app (installable web app; real share sheet over HTTPS) |
+| `static/app-launch.js` | Update checks and invitation-aware Android/web app opening |
 | `static/dashboard.html` | Owner dashboard styled as a proposed *Referrals* section of Adapty |
 | `static/invite.html` | Invite landing page `/r/<CODE>` |
 | `static/lumen.apk`, `static/assetlinks.json` | Android wrapper of `/app` (PWABuilder) and its Digital Asset Links |
 | `scripts/smoke_test.py` | End-to-end check of signup → referral → purchase → reward |
+| `scripts/test_compatibility.py` | Isolated HTTP, invitation handoff and Windows UTF-8 regressions (mock Adapty) |
+| `scripts/test_app_launch.js` | Dependency-free browser API tests for referral, update and app-opening behavior |
 | `tests/test_referrals.py` | Unit tests for identity, program validation, rules engine, caps, once-only payouts, webhook (always mock Adapty) |
 | `AI_LOG.md` | How the team used AI: tools, setup, prompts, what went wrong |
 | `render.yaml` | Render service definition |
-| `.github/workflows/deploy.yml` | CI: compile + smoke test in mock mode, then trigger the Render deploy on `main` |
+| `.github/workflows/deploy.yml` | CI: compile, unit/HTTP/browser regressions and mock smoke test, then trigger the Render deploy on `main` |
 | `.github/workflows/keepalive.yml` | Pings `/healthz` every 10 minutes so Render's free plan doesn't sleep |
 | `docs/` | Architecture, Adapty setup, operations & secrets, demo script |
 
@@ -39,6 +42,8 @@ Read `docs/ARCHITECTURE.md` before changing flows, `docs/ADAPTY_SETUP.md` before
 python3 server.py                                  # mock mode (no keys needed), http://localhost:8080
 python3 scripts/smoke_test.py http://localhost:8080 # must print "ALL CHECKS PASSED"
 python3 -m unittest discover -s tests              # unit tests; never call Adapty, safe with a live .env
+python3 scripts/test_compatibility.py              # isolated mock HTTP and Windows compatibility checks
+node --test scripts/test_app_launch.js             # browser API regressions; no npm dependencies
 ```
 
 - **Live mode locally:** put the sandbox app's secret key in `.env` (see `docs/OPERATIONS.md`). Local servers don't receive Adapty's webhook; inviter rewards then come from the 25-second fallback.

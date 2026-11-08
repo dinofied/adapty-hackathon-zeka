@@ -21,6 +21,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -384,6 +385,83 @@ class WebhookTests(unittest.TestCase):
         self.assertEqual(self.post("/api/reset", {}), 401)
         good = "Basic " + base64.b64encode(b"any:s3cret").decode()
         self.assertEqual(self.post("/api/reset", {}, auth=good), 200)
+
+
+class InvitationTransportTests(unittest.TestCase):
+    def setUp(self):
+        fresh_state(self)
+        key = patch.object(server, "TOKEN_KEY", b"mock-invitation-test-key")
+        key.start()
+        self.addCleanup(key.stop)
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+        self.addCleanup(self.httpd.server_close)
+        self.addCleanup(self.httpd.shutdown)
+        self.base = f"http://127.0.0.1:{self.httpd.server_address[1]}"
+        join("Gone", "gone@example.com")
+        self.code = code("Gone", "gone@example.com")
+        self.cookie = server.referral_cookie(self.code).split(";")[0]
+
+    def request(self, path, body=None):
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *args):
+                return None
+
+        req = urllib.request.Request(self.base + path,
+                                     data=json.dumps(body).encode() if body is not None else None,
+                                     headers={"Content-Type": "application/json", "Cookie": self.cookie})
+        try:
+            response = urllib.request.build_opener(NoRedirect).open(req, timeout=10)
+        except urllib.error.HTTPError as error:
+            response = error
+        with response:
+            return response.status, response.read(), response.headers
+
+    def test_download_lookup_failure_still_serves_apk_or_redirect_without_changing_cookie(self):
+        with tempfile.TemporaryDirectory() as folder:
+            static = Path(folder)
+            (static / "lumen.apk").write_bytes(b"mock APK")
+            with patch.object(server, "STATIC", static), patch.object(server, "ref_info", side_effect=TimeoutError("Offline")):
+                for destination in ("", "https://example.com/lumen.apk"):
+                    with self.subTest(destination=destination), patch.dict(server.ENV, {"APK_URL": destination}):
+                        status, body, headers = self.request("/download/lumen.apk?ref=" + self.code)
+                        self.assertEqual(status, 302 if destination else 200)
+                        self.assertIsNone(headers.get("Set-Cookie"))
+                        if destination:
+                            self.assertEqual(headers["Location"], destination)
+                        else:
+                            self.assertEqual(body, b"mock APK")
+
+    def test_deleted_pending_inviter_clears_cookie_and_does_not_block_organic_signup(self):
+        server.ADAPTY._mock_profiles.pop(cuid("gone@example.com"))
+        status, body, headers = self.request("/api/app/pending-ref")
+        self.assertEqual(status, 200)
+        self.assertIsNone(json.loads(body)["code"])
+        self.assertIn("Max-Age=0", headers["Set-Cookie"])
+        status, body, headers = self.request("/api/app/signup", {
+            "name": "Friend", "email": "pending.friend@example.com", "ref": None,
+        })
+        self.assertEqual(status, 200, body)
+        self.assertIsNone(json.loads(body)["referred_by"])
+        self.assertEqual(attrs(cuid("pending.friend@example.com"))["referral_status"], "organic")
+        self.assertIn("Max-Age=0", headers["Set-Cookie"])
+        status, body, _ = self.request("/api/app/signup", {
+            "name": "Other", "email": "explicit.friend@example.com", "ref": self.code,
+        })
+        self.assertEqual(status, 400, body)
+        self.assertIn("doesn't exist", json.loads(body)["error"])
+        self.assertNotIn(cuid("explicit.friend@example.com"), server.ADAPTY._mock_profiles)
+
+    def test_pending_lookup_outage_keeps_cookie_and_does_not_create_an_organic_account(self):
+        with patch.object(server.ADAPTY, "get_profile", return_value=(False, {"error": "Offline"})):
+            for route, payload in (("/api/app/pending-ref", None),
+                                   ("/api/app/signup", {"name": "Friend", "email": "outage.friend@example.com"})):
+                with self.subTest(route=route):
+                    status, body, headers = self.request(route, payload)
+                    self.assertEqual(status, 400, body)
+                    self.assertIn("didn't answer", json.loads(body)["error"])
+                    self.assertIsNone(headers.get("Set-Cookie"))
+        self.assertNotIn(cuid("outage.friend@example.com"), server.ADAPTY._mock_profiles)
 
 
 # ---------------------------------------------------------------- Adapty client quirks
