@@ -125,6 +125,8 @@
             <h3 style="margin-top:22px">Tiers</h3><p class="sub">By paid referrals. Written to the inviter’s profile as <code>referral_tier</code>.</p>
             <div id="tiers"></div><button class="btn sm" id="add-tier">+ Add tier</button>
             <h3 style="margin-top:22px">Limits</h3>
+            <div class="rule"><span>Who can refer</span><select id="referrers"></select></div>
+            <p class="sub">“Paying subscribers only” stops free accounts from farming rewards with fake friends. Premium days earned from referrals don’t count as paying.</p>
             <div class="rule"><span>Max premium rewards per inviter</span><input id="cap" type="number" min="1" class="n"></div>
             <p class="sub">Always on: no self-referral, one account per email (case, +tags and Gmail dots count as the same).</p>
             <div style="display:flex;gap:8px;margin-top:6px"><button class="btn primary" id="save">Save program</button><button class="btn" id="defaults">Restore defaults</button></div>
@@ -205,6 +207,7 @@ function renderProgram() {
   $("tiers").innerHTML = program.tiers.map((t, i) => `<div class="rule" data-t="${i}"><span class="w">Tier</span><input class="v" data-f="name" maxlength="20" value="${esc(t.name)}">
     <span>from</span><input class="n" data-f="min_paid" type="number" min="1" value="${t.min_paid}"><span>paid referrals</span><button class="x" data-deltier="${i}">×</button></div>`).join("");
   $("cap").value = program.max_rewarded_referrals;
+  $("referrers").innerHTML = opt(c.referrers || { paying:"Paying subscribers only", everyone:"Everyone" }, program.referrers || "paying");
   const custom = [...new Set(program.rules.filter((r) => r.action === "set_attribute" && r.key).map((r) => r.key))];
   // [key, profile, type registered in Adapty, example segment filter]
   const rows = [
@@ -233,6 +236,7 @@ function readProgram() {
   document.querySelectorAll("#tiers .rule").forEach((el) => { const t = program.tiers[+el.dataset.t];
     el.querySelectorAll("[data-f]").forEach((f) => { t[f.dataset.f] = f.type === "number" ? +f.value : f.value; }); });
   program.max_rewarded_referrals = +$("cap").value || 5;
+  program.referrers = $("referrers").value || "paying";
 }
 document.addEventListener("change", (e) => { if (e.target.closest("#t-program")) { dirty = true; readProgram(); renderProgram(); } });
 document.addEventListener("click", async (e) => {

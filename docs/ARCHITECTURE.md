@@ -49,7 +49,7 @@ A 25-second fallback after each purchase calls the same function if the webhook 
 
 **Rewards**: a `grant` rule extends the `premium` access level from its current end date. If the recipient is an inviter who **already has a store subscription**, the days go to `referral_credit_days` instead, so Adapty keeps showing their real subscription. `referral_rewards` counts grants against the program's cap.
 
-**Program (`/api/program`)**: validated JSON `{rules, tiers, max_rewarded_referrals}` stored as the remote config (locale `en`) of the paywall "Referral program settings"; cached 20 s. Editable from the dashboard or directly in Adapty.
+**Program (`/api/program`)**: validated JSON `{rules, tiers, max_rewarded_referrals, referrers}` stored as the remote config (locale `en`) of the paywall "Referral program settings"; cached 20 s. Editable from the dashboard or directly in Adapty.
 
 ## What the dashboard reads
 

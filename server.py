@@ -58,7 +58,11 @@ DEFAULT_PROGRAM = {
     ],
     "tiers": [{"name": "bronze", "min_paid": 1}, {"name": "silver", "min_paid": 3}, {"name": "gold", "min_paid": 5}],
     "max_rewarded_referrals": 5,
+    "referrers": "paying",
 }
+# Who may refer. "paying": only users with an active store subscription (granted reward days don't
+# count), so a free account can't farm rewards with fake friends.
+REFERRERS = {"paying": "Paying subscribers only", "everyone": "Everyone"}
 
 
 def load_env():
@@ -284,7 +288,10 @@ def validate_program(p):
     cap = int(p.get("max_rewarded_referrals") or 0)
     if not 1 <= cap <= 1000:
         raise Problem("The reward cap must be between 1 and 1000.")
-    return {"rules": rules, "tiers": tiers, "max_rewarded_referrals": cap}
+    referrers = p.get("referrers") or "paying"  # programs saved before this setting existed get the safe default
+    if referrers not in REFERRERS:
+        raise Problem("Who can refer: “paying” or “everyone”.")
+    return {"rules": rules, "tiers": tiers, "max_rewarded_referrals": cap, "referrers": referrers}
 
 
 def save_program(p):
@@ -297,6 +304,12 @@ def save_program(p):
     _program_cache.update(at=time.time(), value=p)
     event("program", f"Program saved to Adapty: {len(p['rules'])} rules, {len(p['tiers'])} tiers")
     return p
+
+
+def can_refer(p, program=None):
+    """Whether this Adapty profile may invite friends under the program's "referrers" setting."""
+    program = program or get_program()
+    return program.get("referrers", "paying") == "everyone" or ADAPTY.has_paid_subscription(p or {})
 
 
 def tier_for(paid, tiers):
@@ -406,7 +419,7 @@ def signup(name, email, ref, via, ua, ip, client_device=None):
                      platform=attrs.get("device_platform"))
         return {"token": make_token(cuid), "existing": True, "actions": [], "referred_by": None}
     inviter_cuid = cuid_for_code(ref) if ref else None
-    inviter = None
+    inviter, invite_inactive = None, False
     if ref:
         if inviter_cuid == cuid:
             raise Problem("You can't use your own referral code.")
@@ -415,6 +428,11 @@ def signup(name, email, ref, via, ua, ip, client_device=None):
             raise Problem(f"Referral code {ref.upper()} doesn't exist.")
         inviter = {"cuid": inviter_cuid, "name": name_of(inviter_cuid, ip_.get("custom_attributes")),
                    "attrs": ip_.get("custom_attributes") or {}}
+        if not can_refer(ip_):
+            # The friend still gets an account, as an organic user: no referral, no rewards for anyone.
+            event("blocked", f"{name} signed up with {inviter['name']}’s code, but {inviter['name']} isn’t a paying "
+                  "subscriber, so it doesn’t count as a referral")
+            inviter, invite_inactive = None, True
     attrs = {"referral_code": code, "display_name": name, "device_platform": device["platform"],
              "referral_status": "referred" if inviter else "organic"}
     if inviter:
@@ -437,7 +455,7 @@ def signup(name, email, ref, via, ua, ip, client_device=None):
             ADAPTY.update_attributes(inviter["cuid"], update)
         actions = run_rules("install", {"cuid": cuid, "name": name}, inviter, program, f"{name} joined via {inviter['name']}")
     return {"token": make_token(cuid), "existing": False, "actions": actions,
-            "referred_by": inviter["name"] if inviter else None}
+            "referred_by": inviter["name"] if inviter else None, "invite_inactive": invite_inactive}
 
 
 def purchase(cuid, product):
@@ -469,6 +487,8 @@ def purchase(cuid, product):
 
 
 def share(cuid, channel):
+    if not can_refer(profile(cuid)):
+        raise Problem("Inviting friends is a Premium subscriber perk. Subscribe to get your invite link.")
     with user_lock(cuid):
         attrs = (profile(cuid) or {}).get("custom_attributes") or {}
         ADAPTY.update_attributes(cuid, {"links_shared": num(attrs, "links_shared") + 1})
@@ -479,7 +499,7 @@ def share(cuid, channel):
 def link_opened(code, ip):
     cuid = cuid_for_code(code)
     p = profile(cuid) if cuid else None
-    if not p:
+    if not p or not can_refer(p):  # a non-paying user's link shows "not valid any more"
         return None
     with LOCK, db() as c:
         c.execute("INSERT INTO clicks (code, ip, at) VALUES (?,?,?)", (code.upper(), ip, now()))
@@ -501,7 +521,7 @@ def claim_ref(ip):
 def ref_info(code):
     cuid = cuid_for_code(code)
     p = profile(cuid) if cuid else None
-    if not p:
+    if not p or not can_refer(p):
         return {"code": None}
     days = next((r["days"] for r in get_program()["rules"]
                  if r["trigger"] == "install" and r["recipient"] == "friend" and r["action"] == "grant"), None)
@@ -529,6 +549,7 @@ def app_me(cuid):
         "reward_days": num(a, "referral_reward_days"), "credit_days": num(a, "referral_credit_days"),
         "invited": invited, "premium_until": premium_until(p), "attributes": a,
         "offer": {"friend_days": friend_days, "inviter_days": inviter_days},
+        "can_refer": can_refer(p, program),
         "mode": "mock" if ADAPTY.mock else "live", "platform": a.get("device_platform"),
     }
 
@@ -589,7 +610,8 @@ def state():
     organic = [r for r in rows if not r["referred_by_name"]]
     value = {
         "mode": "mock" if ADAPTY.mock else "live", "placement": ADAPTY.placement_id,
-        "program": get_program(), "catalog": {"triggers": TRIGGERS, "recipients": RECIPIENTS, "actions": ACTIONS},
+        "program": get_program(), "catalog": {"triggers": TRIGGERS, "recipients": RECIPIENTS, "actions": ACTIONS,
+                                                "referrers": REFERRERS},
         "products": PRODUCTS, "users": rows, "rewards": [e for e in events if e["kind"] == "reward"],
         "events": events, "calls": list(CALL_LOG), "webhook": bool(WEBHOOK_SECRET),
         "settings_paywall": SETTINGS_PAYWALL,

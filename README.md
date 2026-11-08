@@ -15,6 +15,7 @@ Adapty has no referral feature, but its docs describe the grant-access endpoint 
 
 | Step | Adapty feature |
 |---|---|
+| Who can refer | Only users with an **active store subscription** in Adapty (granted reward days don't count), so free accounts can't farm rewards. The owner can switch this to everyone |
 | A user signs up | **Profile** created with the phone's real platform (iOS / Android), device and OS. The customer user ID is derived from the email, so duplicates, sign-ins and self-referral checks are Adapty lookups |
 | Referral data | **Custom attributes**, registered in the dashboard so they show in the segment editor (see below) |
 | Friend installs through the link | In production: an **Adapty Attribution deferred deep link** carrying the code as `deferred_data_sub1`, returned by the SDK on first launch. In the demo: the code passes through the link, a cookie or a recent click from the same network |

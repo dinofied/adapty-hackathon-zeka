@@ -43,8 +43,11 @@ The program (`Referral program settings` paywall):
    {"trigger": "first_payment", "recipient": "inviter", "action": "grant", "days": 14},
    {"trigger": "paid_referrals_reached", "n": 3, "recipient": "inviter", "action": "set_attribute", "key": "referral_vip", "value": "yes"}],
  "tiers": [{"name": "bronze", "min_paid": 1}, {"name": "silver", "min_paid": 3}, {"name": "gold", "min_paid": 5}],
- "max_rewarded_referrals": 5}
+ "max_rewarded_referrals": 5,
+ "referrers": "paying"}
 ```
+`referrers`: `paying` (default; only users with an active store subscription can refer) or `everyone`. Programs saved without it count as `paying`.
+
 Triggers: `install`, `first_payment`, `paid_referrals_reached`; actions: `grant` (days 1–365) or `set_attribute` (key ≤ 30 chars, value ≤ 50, not a system key).
 
 ## Custom attributes (registered)

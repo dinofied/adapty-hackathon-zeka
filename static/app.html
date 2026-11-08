@@ -95,6 +95,15 @@ function installCard() {
   return "";
 }
 
+function lockedInvite() {
+  const o = me.offer;
+  const perks = [o.friend_days ? `friends get <b>${o.friend_days} days</b> free` : "",
+                 o.inviter_days ? `you get <b>${o.inviter_days} days</b> when they subscribe` : ""].filter(Boolean).join(", and ");
+  return `<div class="card hero"><h2>Invite friends, get Premium</h2>
+    <p>Inviting friends is a perk for Premium subscribers.${perks ? ` Subscribe to get your invite link: ${perks}.` : ""}${me.premium_until ? " Free Premium days don’t unlock it; a subscription does." : ""}</p>
+    <button class="light" id="unlock">Go Premium to invite friends</button></div>`;
+}
+
 function render() {
   const root = $("root");
   const head = `<div class="top"><img src="/static/icon-192.png" alt=""><b>Lumen</b><span class="sp"></span>${me ? `<span class="chip ${me.premium_until ? "prem" : ""}">${me.premium_until ? "Premium" : "Free"}</span>` : ""}</div>`;
@@ -114,12 +123,12 @@ function render() {
         <p>${me.premium_until ? `Premium until <b>${fmtDate(me.premium_until)}</b>.` : "You’re on the free plan."}${me.invited_by ? ` Invited by ${esc(me.invited_by)}.` : ""}</p>
         <div class="grid"><div></div><div></div><div></div><div></div><div></div><div></div></div>
         <div style="margin-top:12px"><button class="primary" id="upgrade">${me.paid ? "Change plan" : "Go Premium"}</button></div></div>
-      <div class="card hero"><h2>Invite friends, get Premium</h2>
+      ${me.can_refer === false ? lockedInvite() : `<div class="card hero"><h2>Invite friends, get Premium</h2>
         <p>${me.offer.friend_days ? `Friends get <b>${me.offer.friend_days} days</b> free.` : ""} ${me.offer.inviter_days ? `You get <b>${me.offer.inviter_days} days</b> when they subscribe.` : ""}</p>
         <div class="stats"><div><b>${me.referrals_made || 0}</b><span>invited</span></div><div><b>${paidN}</b><span>subscribed</span></div><div><b>${esc(me.tier)}</b><span>tier</span></div></div>
         <button class="light" id="share">Refer a friend</button>
-        <p style="margin:10px 0 0;font-size:13px">Your code: <b>${esc(me.code)}</b></p></div>
-      <div class="card"><h2>Your invites</h2>${inv.length ? `<ul class="list">${inv.map((i) => `<li><span>${esc(i.name)}<br><span class="s">${i.via ? "via " + esc(i.via) : "joined"}</span></span></li>`).join("")}</ul>` : (me.referrals_made ? `<p>${me.referrals_made} friend(s) joined.</p>` : "<p>No invites yet. Share your link!</p>")}</div>
+        <p style="margin:10px 0 0;font-size:13px">Your code: <b>${esc(me.code)}</b></p></div>`}
+      ${me.can_refer === false && !inv.length && !me.referrals_made ? "" : `<div class="card"><h2>Your invites</h2>${inv.length ? `<ul class="list">${inv.map((i) => `<li><span>${esc(i.name)}<br><span class="s">${i.via ? "via " + esc(i.via) : "joined"}</span></span></li>`).join("")}</ul>` : (me.referrals_made ? `<p>${me.referrals_made} friend(s) joined.</p>` : "<p>No invites yet. Share your link!</p>")}</div>`}
       ${me.reward_days || me.credit_days ? `<div class="card"><h2>Rewards</h2><ul class="list">
         ${me.reward_days ? `<li><span>Premium earned from referrals</span><b>${me.reward_days} days</b></li>` : ""}
         ${me.credit_days ? `<li><span>Credit, added after your current subscription<br><span class="s">you already pay, so Adapty keeps your subscription as is</span></span><b>${me.credit_days} days</b></li>` : ""}
@@ -127,7 +136,8 @@ function render() {
       ${installCard()}
       <button class="ghost" id="signout">Sign out (for testing)</button>
       <p class="tiny">Hackathon demo · ${me.mode === "live" ? "connected to Adapty" : "offline mock"} · purchases are simulated</p>`;
-    $("share").addEventListener("click", share);
+    if ($("share")) $("share").addEventListener("click", share);
+    if ($("unlock")) $("unlock").addEventListener("click", openPaywall);
     $("upgrade").addEventListener("click", openPaywall);
     $("signout").addEventListener("click", () => { if (confirm("Sign out? This phone will forget the account.")) { store.del("lumen_token"); store.del("lumen_ref"); location.href = "/app"; } });
   }
@@ -153,7 +163,8 @@ async function signup(e) {
     token = r.token; store.set("lumen_token", token); store.del("lumen_ref");
     me = await api("/api/app/me");
     notice = r.existing ? `Welcome back, ${esc(me.name)}! (found your account in Adapty)`
-      : r.referred_by ? `🎉 Welcome! ${esc(r.referred_by)} invited you.${(r.actions || []).filter((a) => a.to === me.name).map((a) => ` You got ${esc(a.detail)}.`).join("")}` : "Welcome to Lumen!";
+      : r.referred_by ? `🎉 Welcome! ${esc(r.referred_by)} invited you.${(r.actions || []).filter((a) => a.to === me.name).map((a) => ` You got ${esc(a.detail)}.`).join("")}` : r.invite_inactive ? "Welcome to Lumen! That invite link isn’t active any more, so it comes without the free days."
+      : "Welcome to Lumen!";
     render();
   } catch (err) { $("msg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; btn.textContent = "Create account"; }
 }

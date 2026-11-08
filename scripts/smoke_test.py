@@ -4,7 +4,8 @@
 Usage:  python3 scripts/smoke_test.py [BASE_URL]      (default http://localhost:8080)
 
 Against a mock-mode server it touches nothing outside this machine. Against the live site
-it creates two test profiles and one demo purchase in the Adapty sandbox app: use sparingly.
+it creates two test profiles and two demo purchases in the Adapty sandbox app (the inviter has to
+subscribe before referring): use sparingly.
 Exits non-zero on the first failed check.
 """
 
@@ -56,6 +57,19 @@ def main():
 
     s, bad = call("POST", "/api/app/signup", {"name": "X", "email": f"x.{run}@example.com", "ref": "NOPE-00000000"})
     check(s == 400, "unknown referral code is rejected", bad)
+
+    # Only paying subscribers can refer (the program's default "referrers": "paying").
+    check(me.get("can_refer") is False, "a free user can't refer", me.get("can_refer"))
+    s, _ = call("POST", "/api/app/share", {"channel": "smoke"}, token=inv["token"])
+    check(s == 400, "a free user's share is refused")
+    if h.get("mode") == "mock":  # live, this would add one more profile to the shared sandbox app
+        s, org = call("POST", "/api/app/signup", {"name": "Smoke Early", "email": f"smoke.early.{run}@example.com", "ref": code})
+        check(s == 200 and not org.get("referred_by") and org.get("invite_inactive"),
+              "a free user's code doesn't make a referral", org)
+    s, buy0 = call("POST", "/api/app/purchase", {"product": "monthly"}, token=inv["token"])
+    check(s == 200 and buy0.get("recorded"), "inviter subscribes", buy0)
+    s, me = call("GET", "/api/app/me", token=inv["token"])
+    check(me.get("can_refer") is True, "a paying subscriber can refer", me.get("can_refer"))
 
     s, _ = call("POST", "/api/app/share", {"channel": "smoke"}, token=inv["token"])
     check(s == 200, "share is recorded")
