@@ -125,7 +125,7 @@
             <h3 style="margin-top:22px">Tiers</h3><p class="sub">By paid referrals. Written to the inviter’s profile as <code>referral_tier</code>.</p>
             <div id="tiers"></div><button class="btn sm" id="add-tier">+ Add tier</button>
             <h3 style="margin-top:22px">Limits</h3>
-            <div class="rule"><span>Max premium rewards per inviter</span><input id="cap" type="number" min="1" class="n"></div>
+            <div class="rule"><span>Max premium or token rewards per inviter</span><input id="cap" type="number" min="1" class="n"></div>
             <p class="sub">Always on: no self-referral, one account per email (case, +tags and Gmail dots count as the same).</p>
             <div style="display:flex;gap:8px;margin-top:6px"><button class="btn primary" id="save">Save program</button><button class="btn" id="defaults">Restore defaults</button></div>
             <div id="pmsg"></div>
@@ -200,6 +200,7 @@ function renderProgram() {
     ${r.trigger === "paid_referrals_reached" ? `<span>N</span><input class="n" data-f="n" type="number" min="1" value="${r.n ?? 3}">` : ""}
     <span class="w">give</span><select data-f="recipient">${opt(c.recipients, r.recipient)}</select><select data-f="action">${opt(c.actions, r.action)}</select>
     ${r.action === "grant" ? `<input class="n" data-f="days" type="number" min="1" value="${r.days ?? 7}"><span>days</span>`
+      : r.action === "tokens" ? `<input class="n" data-f="amount" type="number" min="1" max="1000" value="${r.amount ?? 20}"><span>tokens</span>`
       : `<input class="k" data-f="key" maxlength="30" placeholder="attribute key" value="${esc(r.key ?? "")}"><span>=</span><input class="v" data-f="value" maxlength="50" placeholder="value" value="${esc(r.value ?? "")}">`}
     <button class="x" data-delrule="${i}" title="Remove">×</button></div>`).join("") || '<p class="sub">No rules: referrals are tracked, nobody is rewarded.</p>';
   $("tiers").innerHTML = program.tiers.map((t, i) => `<div class="rule" data-t="${i}"><span class="w">Tier</span><input class="v" data-f="name" maxlength="20" value="${esc(t.name)}">
@@ -228,7 +229,9 @@ function renderProgram() {
 function readProgram() {
   document.querySelectorAll("#rules .rule").forEach((el) => { const r = program.rules[+el.dataset.i];
     el.querySelectorAll("[data-f]").forEach((f) => { r[f.dataset.f] = f.type === "number" ? +f.value : f.value; });
-    if (r.action === "grant") { r.days = r.days || 7; delete r.key; delete r.value; } else delete r.days;
+    if (r.action === "grant") { r.days = r.days || 7; delete r.key; delete r.value; delete r.amount; }
+    else if (r.action === "tokens") { r.amount = r.amount || 20; delete r.days; delete r.key; delete r.value; }
+    else { delete r.days; delete r.amount; }
     if (r.trigger === "paid_referrals_reached") { r.recipient = "inviter"; r.n = r.n || 3; } else delete r.n; });
   document.querySelectorAll("#tiers .rule").forEach((el) => { const t = program.tiers[+el.dataset.t];
     el.querySelectorAll("[data-f]").forEach((f) => { t[f.dataset.f] = f.type === "number" ? +f.value : f.value; }); });

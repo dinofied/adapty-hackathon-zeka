@@ -92,6 +92,8 @@
   .benefits { padding:12px 0; margin:0; list-style:none; } .benefits li { padding:7px 0; font-size:var(--label); }
   .benefits li::before { content:"✓"; margin-right:10px; color:var(--accent); }
   .upload { display:none; } body.modal-open { overflow:hidden; }
+  .token-chip { width:auto; padding:4px 10px; margin-left:6px; border:none; background:var(--soft); color:var(--accent); font-size:var(--caption); }
+  .token-balance { font:400 var(--heading)/1.2 Georgia,serif; margin:4px 0 8px; } .token-balance span { font:var(--label) -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--muted); }
   @media (max-width:800px) { .studio-layout { grid-template-columns:minmax(0,1fr); } .sidebar { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .sidebar .hero { grid-column:1/-1; } .welcome { gap:28px; } }
   @media (max-width:540px) {
     .wrap { padding:20px 16px; } .top { margin-bottom:24px; } .top-note { display:none; }
@@ -130,6 +132,10 @@ const tools = [
 ];
 const sampleArt = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800"><rect width="1000" height="800" fill="#e7d6b7"/><circle cx="690" cy="230" r="95" fill="#d99562"/><path d="M0 480Q240 210 510 490T1000 420V800H0Z" fill="#a3ad91"/><path d="M0 610Q270 410 520 610T1000 520V800H0Z" fill="#63765d"/><path d="M0 710Q240 580 580 720T1000 650V800H0Z" fill="#3d5144"/></svg>`;
 const premiumActive = () => Boolean(me?.premium_until && Date.parse(me.premium_until) > Date.now());
+// Lumen tokens: Premium effects paid with tokens stay unlocked for the current photo only.
+let unlocked = new Set();
+const tokenPrice = (key) => me?.tokens?.prices?.[key];
+const isUnlocked = (key) => premiumActive() || unlocked.has(key);
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; render(); });
@@ -172,7 +178,7 @@ function installCard() {
 function render() {
   const root = $("root");
   const active = premiumActive();
-  const head = `<header class="top"><svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5"><path d="M18 1v5m0 24v5M1 18h5m24 0h5M6 6l4 4m16 16 4 4M6 30l4-4M26 10l4-4"/></g></svg><span class="brand">lumen</span><span class="top-note">A little light. A little magic.</span><span class="sp"></span>${me ? `<span class="chip ${active ? "prem" : ""}">${active ? "Premium" : "Free studio"}</span>` : ""}</header>`;
+  const head = `<header class="top"><svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5"><path d="M18 1v5m0 24v5M1 18h5m24 0h5M6 6l4 4m16 16 4 4M6 30l4-4M26 10l4-4"/></g></svg><span class="brand">lumen</span><span class="top-note">A little light. A little magic.</span><span class="sp"></span>${me ? `<span class="chip ${active ? "prem" : ""}">${active ? "Premium" : "Free studio"}</span>` : ""}${me?.tokens ? `<button class="chip token-chip" id="tokens-chip" aria-label="${me.tokens.balance} tokens. Get more tokens">◈ ${me.tokens.balance}</button>` : ""}</header>`;
   if (!me) {
     root.innerHTML = head + (ref ? `<div class="banner"><b>${esc(ref.inviter)}</b> saved you a spot${ref.friend_days ? `. Join and enjoy <b>${ref.friend_days} days of Premium</b>` : ""}.</div>` : "") +
       `<main class="welcome"><section class="welcome-copy"><p class="eyebrow">Your everyday photo studio</p><h1>Ordinary moments.<br>Beautifully yours.</h1><p>A softer light, a cinematic mood, a photo worth keeping. Make a little space for creativity.</p>
@@ -187,7 +193,7 @@ function render() {
   } else {
     const inv = me.invited || [];
     const paidN = me.referrals_paid || 0;
-    if (!active && recipe?.premium) { recipe = null; currentEffect = "original"; }
+    if (recipe?.premium && !isUnlocked(recipe.key)) { recipe = null; currentEffect = "original"; }
     root.innerHTML = head + (notice ? `<div class="ok" role="status">${notice}</div>` : "") +
       `<main><section class="studio-heading"><div><p class="eyebrow">Welcome back, ${esc(me.name)}</p><h1>A fresh perspective.</h1>
         <p>${active ? `Your Premium studio, until ${fmtDate(me.premium_until)}.` : "One photo. A whole new feeling."}</p></div>
@@ -200,15 +206,18 @@ function render() {
         </div>
         <div class="section-heading"><h2>Find your mood.</h2><span class="chip">Local effects</span></div>
         <div class="tools">${tools.map((t) => `<button class="tool ${currentEffect === t.key ? "active" : ""}" data-feature="${t.key}" aria-pressed="${currentEffect === t.key}" ${featureBusy ? "disabled" : ""}>
-          <span class="tool-symbol" aria-hidden="true">${t.symbol}</span><strong>${t.name}</strong><span class="tool-desc">${t.description}</span><span class="chip">${t.premium ? active ? "Unlocked" : "Premium · locked" : "Always free"}</span></button>`).join("")}</div>
+          <span class="tool-symbol" aria-hidden="true">${t.symbol}</span><strong>${t.name}</strong><span class="tool-desc">${t.description}</span><span class="chip">${t.premium ? active ? "Unlocked" : unlocked.has(t.key) ? "Unlocked for this photo" : tokenPrice(t.key) ? `◈ ${tokenPrice(t.key)} or Premium` : "Premium · locked" : "Always free"}</span></button>`).join("")}</div>
         <p class="editor-status" id="editor-status" role="status" aria-live="polite">${esc(editorMessage || "Try the illustrated sample, or choose your own photo. Nothing is uploaded.")}</p>
-        <div class="toolbar"><button class="light" id="export-preview">Export preview</button><button class="primary" id="export-full">${active ? "Export full size" : "Full-size export · Premium"}</button></div>
+        <div class="toolbar"><button class="light" id="export-preview">Export preview</button><button class="primary" id="export-full">${active ? "Export full size" : tokenPrice("export_full") ? `Full-size export · ◈ ${tokenPrice("export_full")}` : "Full-size export · Premium"}</button></div>
         <p class="tiny" style="text-align:left">Preview exports: up to 800px. Premium exports: up to 4096px. Photo effects run on your device, not an AI service.</p>
       </section><aside class="sidebar" aria-label="Referral program"><div class="card hero"><p class="eyebrow">Good things are better shared</p><h2>A little gift of light.</h2>
         <p>${me.offer.friend_days ? `Friends get <b>${me.offer.friend_days} days</b> free.` : ""} ${me.offer.inviter_days ? `You get <b>${me.offer.inviter_days} days</b> when they subscribe.` : ""}</p>
         <div class="stats"><div><b>${me.referrals_made || 0}</b><span>invited</span></div><div><b>${paidN}</b><span>subscribed</span></div><div><b>${esc(me.tier)}</b><span>tier</span></div></div>
         <button class="light" id="share">Refer a friend</button>
         <p style="margin:10px 0 0;font-size:13px">Your code: <b>${esc(me.code)}</b></p></div>
+      ${me.tokens ? `<div class="card"><h2>Your tokens</h2><p class="token-balance">◈ ${me.tokens.balance} <span>tokens</span></p>
+        <p>${active ? "Premium includes every effect, so you don’t need tokens right now." : "Use them for a Premium effect on one photo, or a full-size export."}</p>
+        <button class="light" id="get-tokens">Get tokens</button></div>` : ""}
       <div class="card"><h2>Your invites</h2>${inv.length ? `<ul class="list">${inv.map((i) => `<li><span>${esc(i.name)}<br><span class="s">${i.via ? "via " + esc(i.via) : "joined"}</span></span></li>`).join("")}</ul>` : (me.referrals_made ? `<p>${me.referrals_made} friend(s) joined.</p>` : "<p>No invites yet. Share your link!</p>")}</div>
       ${me.reward_days || me.credit_days ? `<div class="card"><h2>Your rewards</h2><ul class="list">
         ${me.reward_days ? `<li><span>Premium earned from referrals</span><b>${me.reward_days} days</b></li>` : ""}
@@ -224,6 +233,8 @@ function render() {
     document.querySelectorAll("[data-feature]").forEach((button) => button.addEventListener("click", () => useFeature(button.dataset.feature)));
     $("export-preview").addEventListener("click", () => exportPhoto(800));
     $("export-full").addEventListener("click", () => useFeature("export_full"));
+    $("get-tokens")?.addEventListener("click", () => openTokens());
+    $("tokens-chip")?.addEventListener("click", () => openTokens());
     if (photoImage) drawPhoto($("photo"), 1600);
     else loadSample();
     $("signout").addEventListener("click", () => { if (confirm("Sign out? This phone will forget the account.")) { store.del("lumen_token"); store.del("lumen_ref"); location.href = "/app"; } });
@@ -252,7 +263,7 @@ function loadPhoto(e) {
   image.onload = () => {
     URL.revokeObjectURL(url);
     if (image.naturalWidth * image.naturalHeight > 60000000) { setEditorMessage("This photo is too large. Choose one under 60 megapixels."); return; }
-    photoImage = image; photoName = file.name; recipe = null; currentEffect = "original";
+    photoImage = image; photoName = file.name; recipe = null; currentEffect = "original"; unlocked = new Set();
     setEditorMessage("Your photo is ready. Pick a mood."); render();
   };
   image.onerror = () => { URL.revokeObjectURL(url); setEditorMessage("This photo could not be opened. Try another file."); };
@@ -280,7 +291,11 @@ async function useFeature(key) {
   if (featureBusy) return;
   const tool = tools.find((t) => t.key === key);
   const name = tool?.name || "Full-size export";
-  if ((tool?.premium || key === "export_full") && !premiumActive()) { await openPaywall(name); return; }
+  if ((tool?.premium || key === "export_full") && !premiumActive() && !(tool && unlocked.has(key))) {
+    if (key === "export_full" && !photoImage) { setEditorMessage("Your photo is still loading. Try again in a moment."); return; }
+    if (me.tokens) await openTokens(key); else await openPaywall(name);
+    return;
+  }
   featureBusy = true;
   try {
     if (key === "export_full") { exportPhoto(4096); }
@@ -295,7 +310,7 @@ async function useFeature(key) {
 
 function exportPhoto(maxSize) {
   if (!photoImage) { setEditorMessage("Your photo is still loading. Try again in a moment."); return; }
-  if (recipe?.premium && !premiumActive()) { recipe = null; currentEffect = "original"; render(); openPaywall("Premium effects"); return; }
+  if (recipe?.premium && !isUnlocked(recipe.key)) { recipe = null; currentEffect = "original"; render(); openPaywall("Premium effects"); return; }
   const canvas = document.createElement("canvas");
   drawPhoto(canvas, maxSize);
   canvas.toBlob((blob) => {
@@ -328,6 +343,7 @@ async function signup(e) {
     me = await api("/api/app/me");
     notice = r.existing ? `Welcome back, ${esc(me.name)}! (found your account in Adapty)`
       : r.referred_by ? `🎉 Welcome! ${esc(r.referred_by)} invited you.${(r.actions || []).filter((a) => a.to === me.name).map((a) => ` You got ${esc(a.detail)}.`).join("")}` : "Welcome to Lumen!";
+    if (!r.existing && me.tokens?.balance) notice += ` Here are <b>${me.tokens.balance} tokens</b> to try a Premium effect.`;
     render();
   } catch (err) { $("msg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; btn.textContent = "Enter my studio"; }
 }
@@ -372,6 +388,66 @@ function showToast(message) {
   const bubble = $("toast");
   bubble.textContent = message; bubble.classList.add("visible");
   toastTimer = setTimeout(() => { bubble.classList.remove("visible"); bubble.textContent = ""; }, 3000);
+}
+
+// Spend tokens on one item (a Premium effect for this photo, or a full-size export), or buy a token pack.
+// The balance lives in Adapty (virtual currency TOKENS); the server spends and credits it.
+async function openTokens(item = null) {
+  if (document.querySelector(".sheet-bg") || !me?.tokens) return;
+  const previousFocus = document.activeElement;
+  const tool = tools.find((t) => t.key === item);
+  const name = tool?.name || (item === "export_full" ? "Full-size export" : "");
+  const bg = document.createElement("div"); bg.className = "sheet-bg";
+  bg.innerHTML = `<section class="sheet" role="dialog" aria-modal="true" aria-label="Lumen tokens" tabindex="-1"></section>`;
+  const sheet = bg.querySelector(".sheet");
+  let busy = false, message = "";
+  const close = () => { bg.remove(); document.body.classList.remove("modal-open"); if (previousFocus?.isConnected) previousFocus.focus(); };
+  document.body.appendChild(bg); document.body.classList.add("modal-open");
+  bg.addEventListener("click", (e) => { if (e.target === bg && !busy) close(); });
+  bg.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !busy) close();
+    if (e.key === "Tab") {
+      const focusable = [...bg.querySelectorAll("button:not(:disabled)")];
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { e.preventDefault(); last?.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+    }
+  });
+  const lock = (on) => { busy = on; sheet.querySelectorAll("button").forEach((b) => { b.disabled = on; }); };
+  const draw = () => {
+    const w = me.tokens, cost = item ? w.prices[item] : 0, enough = w.balance >= cost;
+    sheet.innerHTML = `<div class="sheet-head"><span class="eyebrow" style="margin:0">Lumen tokens</span><button class="close-button" aria-label="Close">×</button></div>
+      <h1>${item ? esc(name) : "Your tokens"}</h1>
+      <p>${item ? (tool ? `Use ${esc(name)} on this photo for <b>◈ ${cost} tokens</b>.` : `Export this photo at full size, up to 4096px, for <b>◈ ${cost} tokens</b>.`)
+        : "Use tokens for a Premium effect on one photo, or a full-size export."} You have <b>◈ ${w.balance}</b>.</p>
+      ${item ? `<button class="primary" id="spend" ${enough ? "" : "disabled"}>${enough ? `Use ${cost} tokens` : `You need ${cost - w.balance} more tokens`}</button>` : ""}
+      <p class="eyebrow" style="margin:22px 0 4px">Get more tokens</p>
+      <div role="group" aria-label="Token packs">${w.packs.map((p) => `<button class="plan" data-pack="${esc(p.key)}"><span><b>◈ ${esc(p.label)}</b></span><span class="plan-price"><b>$${Number(p.price).toFixed(2)}</b><br><span style="font-weight:400">one-time</span></span></button>`).join("")}</div>
+      <div role="status" aria-live="polite">${message}</div>
+      <button class="light" id="go-premium" style="margin-top:12px">Or go Premium: every effect, no tokens</button>
+      <p class="tiny">Demo purchases only. No real payment. Your balance is kept in Adapty.</p>`;
+    sheet.querySelector(".close-button").addEventListener("click", close);
+    sheet.querySelector("#go-premium").addEventListener("click", () => { close(); openPaywall(name); });
+    sheet.querySelector("#spend")?.addEventListener("click", async () => {
+      lock(true);
+      try {
+        const r = await api("/api/app/tokens/spend", { item });
+        if (typeof r.balance === "number") me.tokens.balance = r.balance;
+        close();
+        if (tool) { unlocked.add(item); recipe = tool; currentEffect = item; editorMessage = `${name} is yours for this photo. ◈ ${r.spent} tokens used.`; render(); }
+        else { render(); exportPhoto(4096); }
+      } catch (err) { message = `<p class="err">${esc(err.message)}</p>`; lock(false); draw(); }
+    });
+    sheet.querySelectorAll("[data-pack]").forEach((b) => b.addEventListener("click", async () => {
+      lock(true); b.querySelector("b").textContent = "Adding tokens…";
+      try { const r = await api("/api/app/tokens/buy", { pack:b.dataset.pack }); me.tokens.balance = r.balance;
+        message = `<p class="ok" style="margin:10px 0 0">◈ ${r.added} tokens added. Demo purchase, no charge.</p>`; render();
+      } catch (err) { message = `<p class="err">${esc(err.message)}</p>`; }
+      busy = false; draw(); (sheet.querySelector("#spend:not(:disabled)") || sheet.querySelector(".close-button")).focus();
+    }));
+  };
+  draw();
+  (sheet.querySelector("#spend:not(:disabled)") || sheet.querySelector(".close-button")).focus();
 }
 
 async function openPaywall(featureName = "") {

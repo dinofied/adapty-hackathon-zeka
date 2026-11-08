@@ -68,6 +68,13 @@ New attribute you want to segment on? Register it: Profiles & Segments → Segme
 
 Integrations → Webhook: production and sandbox URL `https://lumen-referrals.onrender.com/webhooks/adapty`, Authorization header = the value the server prints at startup ("Adapty webhook setup", derived from the secret key), **Send user attributes** on, events include Subscription started, Non-subscription purchase, Trial converted. The server answers the empty verification request without the header.
 
+## Lumen tokens (not set up yet: needs a human)
+
+Mock mode works without any of this. For live mode, in the **sandbox app only**:
+1. Products → **Virtual currency** tab → **New virtual currency**, code `TOKENS`, name "Lumen tokens".
+2. Create one-time products `lumen.demo.tokens30` and `lumen.demo.tokens100`. **Don't link them to `TOKENS`**: the server credits the tokens after recording the purchase, so a link would credit them twice.
+3. Adapty's docs say the server API for virtual currencies may have to be enabled by Adapty support (`403 feature_not_enabled`). Until it is, the app hides tokens and stays subscription-only.
+
 ## Things that can't be done here
 
 - **Event feed** is locked until the app is linked to a real App Store / Google Play app.
