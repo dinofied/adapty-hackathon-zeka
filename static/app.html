@@ -114,6 +114,7 @@
 <body>
 <div class="wrap" id="root"><p style="text-align:center;margin-top:40vh">Loading…</p></div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<script src="/static/app-launch.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -131,7 +132,14 @@ const tools = [
 const sampleArt = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800"><rect width="1000" height="800" fill="#e7d6b7"/><circle cx="690" cy="230" r="95" fill="#d99562"/><path d="M0 480Q240 210 510 490T1000 420V800H0Z" fill="#a3ad91"/><path d="M0 610Q270 410 520 610T1000 520V800H0Z" fill="#63765d"/><path d="M0 710Q240 580 580 720T1000 650V800H0Z" fill="#3d5144"/></svg>`;
 const premiumActive = () => Boolean(me?.premium_until && Date.parse(me.premium_until) > Date.now());
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  const controlled = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (controlled && !reloading) { reloading = true; location.reload(); }
+  });
+  window.LumenLaunch?.checkForUpdate();
+}
 addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; render(); });
 
 async function api(path, body) {
@@ -146,19 +154,29 @@ const inviteLink = () => `${location.origin}/r/${me.code}`;
 const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { day:"numeric", month:"short", year:"numeric" });
 
 async function start() {
-  const qref = new URLSearchParams(location.search).get("ref");
+  const qref = new URLSearchParams(location.search).get("ref") || location.pathname.match(/^\/r\/([A-Za-z0-9-]+)$/)?.[1];
   store.del("lumen_ref");
   if (qref) document.getElementById("manifest").href = `/manifest.webmanifest?ref=${encodeURIComponent(qref)}`;
   if (token) {
     try { me = await api("/api/app/me"); } catch { token = null; store.del("lumen_token"); }
   }
-  if (!me) {
+  if (me) {
+    api("/api/app/pending-ref?clear=1").catch(() => {});
+    if (qref) notice = "Welcome back. Invitations apply to new accounts; your original referral stays unchanged.";
+  } else {
     if (qref) {
-      try { ref = await api(`/api/app/ref?code=${encodeURIComponent(qref)}`); } catch { ref = null; }
       const expectedCode = qref.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 20);
-      if (!expectedCode || ref?.code !== expectedCode) ref = null;
+      ref = { code:qref.trim().toUpperCase() };
+      try {
+        const info = await api(`/api/app/ref?code=${encodeURIComponent(qref)}`);
+        if (expectedCode && info.code === expectedCode) ref = info;
+      } catch {}
+    } else {
+      try { ref = await api("/api/app/pending-ref"); } catch { ref = null; }
+      if (!ref?.code) ref = null;
     }
   }
+  if (!me && ref?.code) document.getElementById("manifest").href = `/manifest.webmanifest?ref=${encodeURIComponent(ref.code)}`;
   render();
 }
 
@@ -174,13 +192,14 @@ function render() {
   const active = premiumActive();
   const head = `<header class="top"><svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5"><path d="M18 1v5m0 24v5M1 18h5m24 0h5M6 6l4 4m16 16 4 4M6 30l4-4M26 10l4-4"/></g></svg><span class="brand">lumen</span><span class="top-note">A little light. A little magic.</span><span class="sp"></span>${me ? `<span class="chip ${active ? "prem" : ""}">${active ? "Premium" : "Free studio"}</span>` : ""}</header>`;
   if (!me) {
-    root.innerHTML = head + (ref ? `<div class="banner"><b>${esc(ref.inviter)}</b> saved you a spot${ref.friend_days ? `. Join and enjoy <b>${ref.friend_days} days of Premium</b>` : ""}.</div>` : "") +
+    root.innerHTML = head + (ref ? `<div class="banner"><b>${esc(ref.inviter || "A friend")}</b> saved you a spot${ref.friend_days ? `. Join and enjoy <b>${ref.friend_days} days of Premium</b>` : ""}.</div>` : "") +
       `<main class="welcome"><section class="welcome-copy"><p class="eyebrow">Your everyday photo studio</p><h1>Ordinary moments.<br>Beautifully yours.</h1><p>A softer light, a cinematic mood, a photo worth keeping. Make a little space for creativity.</p>
         <figure class="welcome-art">${sampleArt.replace("<svg ", '<svg class="sample-art" role="img" aria-label="Illustrated landscape sample" ')}<figcaption>A little study in light — Lumen sample</figcaption></figure>
         <p class="tiny" style="text-align:left">Local photo effects. Your images stay on this device.</p></section>
       <section><div class="card"><p class="eyebrow">Make yourself at home</p><h2>Your studio starts here.</h2><p>Create an account, or use the same email to return. Demo sign-in; no email verification.</p>
         <form id="signup"><label for="n">Name</label><input id="n" required maxlength="40" autocomplete="given-name" placeholder="Your name">
         <label for="e">Email</label><input id="e" type="email" required autocomplete="email" placeholder="you@example.com">
+        <label for="ref-code">Invitation code (optional)</label><input id="ref-code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Paste your friend's code" value="${esc(ref?.code || "")}">
         <div style="margin-top:20px"><button class="primary">Enter my studio</button></div></form><div id="msg" role="status" aria-live="polite"></div></div>${installCard()}</section></main>
       <footer class="footer"><p>Made for moments, not perfection.</p><p>Hackathon demo · subscriptions are simulated · powered by Adapty</p></footer>`;
     $("signup").addEventListener("submit", signup);
@@ -323,10 +342,12 @@ async function signup(e) {
   e.preventDefault();
   const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Creating…";
   try {
-    const r = await api("/api/app/signup", { name:$("n").value, email:$("e").value, ref:ref?.code || null, device:await deviceInfo() });
+    const code = $("ref-code").value.trim().toUpperCase();
+    if (code && !/^[A-Z]{1,5}-[0-9A-F]{8}$/.test(code)) throw new Error("Enter a valid invitation code, such as NAME-1234ABCD.");
+    const r = await api("/api/app/signup", { name:$("n").value, email:$("e").value, ref:code || null, use_pending_ref:!ref?.code, device:await deviceInfo() });
     token = r.token; store.set("lumen_token", token); store.del("lumen_ref");
     me = await api("/api/app/me");
-    notice = r.existing ? `Welcome back, ${esc(me.name)}! (found your account in Adapty)`
+    notice = r.existing ? `Welcome back, ${esc(me.name)}!${code ? " Your existing account keeps its original referral; invitations only apply to new accounts." : " (found your account in Adapty)"}`
       : r.referred_by ? `🎉 Welcome! ${esc(r.referred_by)} invited you.${(r.actions || []).filter((a) => a.to === me.name).map((a) => ` You got ${esc(a.detail)}.`).join("")}` : "Welcome to Lumen!";
     render();
   } catch (err) { $("msg").innerHTML = `<div class="err">${esc(err.message)}</div>`; btn.disabled = false; btn.textContent = "Enter my studio"; }

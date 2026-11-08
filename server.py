@@ -641,6 +641,32 @@ def clean_code(raw):
     return re.sub(r"[^A-Z0-9-]", "", unquote(raw or "").upper())[:20]
 
 
+REFERRAL_INTENT_SECONDS = 3600
+
+
+def referral_cookie(code=None):
+    value, age = "", 0
+    if code:
+        payload = f"{code}.{int(time.time())}"
+        signature = hmac.new(TOKEN_KEY, f"referral:{payload}".encode(), hashlib.sha256).hexdigest()[:24]
+        value, age = f"{payload}.{signature}", REFERRAL_INTENT_SECONDS
+    return f"lumen_pending_ref={value}; Max-Age={age}; Path=/; SameSite=Lax; Secure; HttpOnly"
+
+
+def pending_referral(value):
+    try:
+        code, issued, signature = (value or "").rsplit(".", 2)
+        if clean_code(code) != code or not cuid_for_code(code):
+            return None
+        if not 0 <= time.time() - int(issued) <= REFERRAL_INTENT_SECONDS:
+            return None
+        payload = f"referral:{code}.{issued}"
+        expected = hmac.new(TOKEN_KEY, payload.encode(), hashlib.sha256).hexdigest()[:24]
+        return code if hmac.compare_digest(signature, expected) else None
+    except (ValueError, TypeError):
+        return None
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "LumenReferrals/2.0"
 
@@ -656,15 +682,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         for k, v in (headers or {}).items():
-            self.send_header(k, v)
+            for value in v if isinstance(v, (list, tuple)) else [v]:
+                self.send_header(k, value)
         self.end_headers()
         self.wfile.write(body)
 
-    def _file(self, path, cache=False):
+    def _file(self, path, cache=False, headers=None):
         if not path.is_file():
             return self._send(404, {"error": "Not found"})
         self._send(200, path.read_bytes(), TYPES.get(path.suffix, "application/octet-stream"),
-                   {"Cache-Control": "public, max-age=3600"} if cache else None)
+                   {**({"Cache-Control": "public, max-age=3600"} if cache else {}), **(headers or {})})
 
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
@@ -712,9 +739,9 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         return True
 
-    def _handle(self, fn):
+    def _handle(self, fn, headers=None):
         try:
-            self._send(200, fn())
+            self._send(200, fn(), headers=headers)
         except Problem as e:
             self._send(400, {"error": str(e)})
         except Exception as e:  # keep the demo alive, show the error
@@ -735,7 +762,10 @@ class Handler(BaseHTTPRequestHandler):
                 page = page.replace('href="/manifest.webmanifest"', f'href="/manifest.webmanifest?ref={ref}"')
             return self._send(200, page, "text/html; charset=utf-8")
         if path == "/sw.js":
-            return self._file(STATIC / "sw.js")
+            version = hashlib.sha256(b"".join((STATIC / name).read_bytes()
+                                            for name in ("app.html", "app-launch.js", "sw.js"))).hexdigest()[:12]
+            worker = (STATIC / "sw.js").read_text(encoding="utf-8").replace("{{VERSION}}", version)
+            return self._send(200, worker, TYPES[".js"])
         if path == "/manifest.webmanifest":
             return self._send(200, manifest(clean_code(params.get("ref"))), "application/manifest+json")
         if path == "/.well-known/assetlinks.json":
@@ -746,11 +776,22 @@ class Handler(BaseHTTPRequestHandler):
             name = path[len("/static/"):]
             if not re.fullmatch(r"[A-Za-z0-9_.-]+", name) or name.endswith(".html"):
                 return self._send(404, {"error": "Not found"})
-            return self._file(STATIC / name, cache=True)
+            return self._file(STATIC / name, cache=name != "app-launch.js")
         if path == "/download/lumen.apk":
+            headers = {}
+            if params.get("ref"):
+                ref = clean_code(params["ref"])
+                try:
+                    valid = ref and ref_info(ref).get("code") == ref
+                except Exception:
+                    return self._send(503, {"error": "Couldn't verify the invitation. Please try again."})
+                if not valid:
+                    return self._send(400, {"error": "Invalid invitation code."},
+                                      headers={"Set-Cookie": referral_cookie()})
+                headers["Set-Cookie"] = referral_cookie(ref)
             if ENV.get("APK_URL"):
-                return self._send(302, b"", headers={"Location": ENV["APK_URL"]})
-            return self._file(STATIC / "lumen.apk")
+                return self._send(302, b"", headers={"Location": ENV["APK_URL"], **headers})
+            return self._file(STATIC / "lumen.apk", headers=headers)
         m = re.fullmatch(r"/r/([A-Za-z0-9-]{1,20})", path)
         if m:
             code = clean_code(m.group(1))
@@ -763,12 +804,18 @@ class Handler(BaseHTTPRequestHandler):
                         .replace("{{NAME}}", re.sub(r"[<>&\"']", "", inv["name"]) if inv else "A friend")
                         .replace("{{VALID}}", "1" if inv else "0")
                         .replace("{{APK}}", "1" if (ENV.get("APK_URL") or (STATIC / "lumen.apk").exists()) else "0"))
-            cookie = f"lumen_ref={code}; Max-Age=86400; Path=/; SameSite=Lax; Secure" if inv else ""
-            return self._send(200, page, "text/html; charset=utf-8", {"Set-Cookie": cookie} if cookie else None)
+            cookies = [referral_cookie(code if inv else None)]
+            if inv:
+                cookies.append(f"lumen_ref={code}; Max-Age=86400; Path=/; SameSite=Lax; Secure")
+            return self._send(200, page, "text/html; charset=utf-8", {"Set-Cookie": cookies})
         if path == "/api/app/me":
             return self._handle(lambda: app_me(self._me()))
         if path == "/api/app/paywall":
             return self._handle(lambda: app_paywall(self._me()))
+        if path == "/api/app/pending-ref":
+            code = None if params.get("clear") == "1" else pending_referral(self._cookie("lumen_pending_ref"))
+            return self._handle(lambda: {**ref_info(code), "how": "install"} if code else {"code": None},
+                                headers=None if code else {"Set-Cookie": referral_cookie()})
         if path == "/api/app/ref":
             def find():
                 code = clean_code(params.get("code")) or clean_code(self._cookie("lumen_ref"))
@@ -798,14 +845,19 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/app/signup":
             def go():
                 b = self._body()
-                ref = clean_code(b.get("ref")) or None
+                raw = b.get("ref") or ""
+                ref = (clean_code(raw) if raw else
+                       pending_referral(self._cookie("lumen_pending_ref")) if b.get("use_pending_ref", True) else None)
+                if raw and not ref:
+                    raise Problem("Enter a valid invitation code.")
                 r = signup(b.get("name", ""), b.get("email", ""), ref, (b.get("via") or ("Link" if ref else None)),
                            self.headers.get("User-Agent", ""), self._ip(), b.get("device"))
                 if ref:
                     with LOCK, db() as c:
                         c.execute("UPDATE clicks SET claimed = 1 WHERE code = ? AND ip = ?", (ref, self._ip()))
+                _state_cache["value"] = None
                 return r
-            return self._handle(go)
+            return self._handle(go, headers={"Set-Cookie": referral_cookie()})
         if path == "/api/app/share":
             return self._handle(lambda: share(self._me(), str(self._body().get("channel", "share"))[:20]))
         if path == "/api/app/purchase":

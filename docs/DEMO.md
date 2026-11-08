@@ -4,13 +4,15 @@
 
 - **Android:** open https://lumen-referrals.onrender.com/download/lumen.apk, allow installs from the browser, open Lumen. Or open `/app` in Chrome → menu → Install.
 - **iPhone:** open https://lumen-referrals.onrender.com/app in **Safari** → Share → Add to Home Screen.
-- A friend should open the **invite link in Chrome/Safari first**, then use its app link or install the web app; the explicit referral code carries through the link and install manifest. Opening the app directly without that code does not apply a referral.
+- A friend should open the **invite link in Chrome/Safari first**. On Android, download from that invitation, install, return to the invitation and tap **Open Lumen**. This passes the code directly to the wrapper (or the web fallback). The fresh invitation also survives first launch when the browser and wrapper share cookies. If they do not, enter the displayed invitation code before signup. Web installs retain it in the manifest.
+- Use a **new email** for the friend. An already-created account keeps its original attribution, including organic attribution; reinstalling does not make it a new referral or repeat rewards.
+- Opening through an invitation checks for updated web content before opening/focusing Lumen. Android package upgrades cannot be silent and are separate from web updates.
 
 ## Script (about 3 minutes)
 
 1. **Dashboard → Program**: "The owner decides what a referral earns. These rules are stored in Adapty, as the remote config of a settings paywall."
 2. **Phone 1**: sign up → *Refer a friend* → choose a messaging app and send (if native sharing is unavailable, paste the copied link into a message).
-3. **Phone 2**: open the link → install → open. "The invite is applied; Adapty's segment *Referred users* gives them the *Referral welcome* paywall, with copy from its remote config."
+3. **Phone 2**: open the link → install → return to the invitation → **Open Lumen** → sign up with a new email. Check the pre-filled invitation code. "The invite is applied; Adapty's segment *Referred users* gives them the *Referral welcome* paywall, with copy from its remote config."
 4. **Phone 2**: subscribe (demo purchase, recorded as an App Store / Google Play transaction in Adapty).
 5. **Phone 1** (pull to refresh after ~2 s): "Adapty's webhook told us the friend paid; the inviter got 14 days of premium and moved to tier bronze."
 6. **Dashboard → Referrers → Open in Adapty ↗**: the real profiles — platform, transaction, access level, referral attributes.
