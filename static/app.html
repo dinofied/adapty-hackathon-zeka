@@ -88,7 +88,9 @@
   .tool strong { font-size:var(--body); margin-bottom:6px; } .tool-desc { font-weight:400; color:var(--muted); font-size:var(--label); margin-bottom:12px; }
   .tool .chip { margin-top:auto; } .editor-status { min-height:25px; margin:12px 0; font-size:var(--label); }
   .footer { display:flex; justify-content:space-between; gap:16px; border-top:1px solid var(--line); padding:20px 0 0; margin-top:32px; }
-  .footer p { font-size:var(--caption); margin:0; } .footer button { width:auto; padding:0; }
+  .footer p { font-size:var(--caption); margin:0; } .footer button { width:auto; padding:8px 16px; }
+  .link-button { display:inline; width:auto; padding:0; border:none; background:none; color:var(--accent); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; }
+  .link-button:hover:not(:disabled) { transform:none; } .nowrap { white-space:nowrap; } .chip-extra { margin-left:.3em; }
   .benefits { padding:12px 0; margin:0; list-style:none; } .benefits li { padding:7px 0; font-size:var(--label); }
   .benefits li::before { content:"✓"; margin-right:10px; color:var(--accent); }
   .upload { display:none; } body.modal-open { overflow:hidden; }
@@ -101,11 +103,11 @@
     .welcome .card { padding:24px; } .studio-heading { align-items:start; } .studio-heading h1 { font-size:36px; }
     .studio-heading .primary { min-width:0; max-width:110px; padding:10px; }
     .photo-mat { padding:16px; } .tools { grid-template-columns:1fr; gap:8px; }
-    .tool { display:grid; grid-template-columns:32px minmax(0,1fr) 90px; align-items:center; column-gap:10px; padding:14px; min-height:0; }
+    .tool { display:grid; grid-template-columns:32px minmax(0,1fr) auto; align-items:center; column-gap:10px; padding:14px; min-height:0; }
     .tool-symbol { grid-column:1; grid-row:1/3; margin:0; }
     .tool strong { grid-column:2; grid-row:1; font-size:var(--label); }
     .tool-desc { grid-column:2; grid-row:2; font-size:var(--label); margin:0; }
-    .tool .chip { grid-column:3; grid-row:1/3; margin:0; white-space:normal; text-align:center; justify-content:center; }
+    .tool .chip { grid-column:3; grid-row:1/3; margin:0; text-align:center; justify-content:center; } .chip-extra { display:none; }
     .sidebar { display:block; } .card { padding:20px; }
     .sheet-bg { padding:12px; } .sheet { padding:20px; max-height:calc(100dvh - 24px); } .sheet h1 { font-size:32px; }
     .footer { flex-direction:column; align-items:start; } .toolbar button { min-width:100px; }
@@ -217,7 +219,7 @@ function render() {
     const paidN = me.referrals_paid || 0;
     if (recipe?.premium && !isUnlocked(recipe.key)) { recipe = null; currentEffect = "original"; }
     root.innerHTML = head + (notice ? `<div class="ok" role="status">${notice}</div>` : "") +
-      `<main><section class="studio-heading"><div><p class="eyebrow">Welcome back, ${esc(me.name)}</p><h1>A fresh perspective.</h1>
+      `<main><section class="studio-heading"><div><p class="eyebrow">Welcome back, ${esc(me.name)} · <button class="link-button" id="signout-top">Sign out</button></p><h1>A fresh perspective.</h1>
         <p>${active ? `Your Premium studio, until ${fmtDate(me.premium_until)}.` : "One photo. A whole new feeling."}</p></div>
         <button class="primary" id="upgrade">${active ? "View plans" : "Explore Premium"}</button></section>
       <div class="studio-layout"><section class="workspace" aria-label="Photo studio">
@@ -228,9 +230,9 @@ function render() {
         </div>
         <div class="section-heading"><h2>Find your mood.</h2><span class="chip">Local effects</span></div>
         <div class="tools">${tools.map((t) => `<button class="tool ${currentEffect === t.key ? "active" : ""}" data-feature="${t.key}" aria-pressed="${currentEffect === t.key}" ${featureBusy ? "disabled" : ""}>
-          <span class="tool-symbol" aria-hidden="true">${t.symbol}</span><strong>${t.name}</strong><span class="tool-desc">${t.description}</span><span class="chip">${t.premium ? active ? "Unlocked" : unlocked.has(t.key) ? "Unlocked for this photo" : tokenPrice(t.key) ? `◈ ${tokenPrice(t.key)} or Premium` : "Premium · locked" : "Always free"}</span></button>`).join("")}</div>
+          <span class="tool-symbol" aria-hidden="true">${t.symbol}</span><strong>${t.name}</strong><span class="tool-desc">${t.description}</span><span class="chip">${t.premium ? active ? "Unlocked" : unlocked.has(t.key) ? `Unlocked<span class="chip-extra"> for this photo</span>` : tokenPrice(t.key) ? `◈ ${tokenPrice(t.key)}<span class="chip-extra"> or Premium</span>` : "Premium · locked" : "Always free"}</span></button>`).join("")}</div>
         <p class="editor-status" id="editor-status" role="status" aria-live="polite">${esc(editorMessage || "Try the illustrated sample, or choose your own photo. Nothing is uploaded.")}</p>
-        <div class="toolbar"><button class="light" id="export-preview">Export preview</button><button class="primary" id="export-full">${active ? "Export full size" : tokenPrice("export_full") ? `Full-size export · ◈ ${tokenPrice("export_full")}` : "Full-size export · Premium"}</button></div>
+        <div class="toolbar"><button class="light" id="export-preview">Export preview</button><button class="primary" id="export-full">${active ? "Export full size" : tokenPrice("export_full") ? `Full-size export · <span class="nowrap">◈ ${tokenPrice("export_full")}</span>` : "Full-size export · Premium"}</button></div>
         <p class="tiny" style="text-align:left">Preview exports: up to 800px. Premium exports: up to 4096px. Photo effects run on your device, not an AI service.</p>
       </section><aside class="sidebar" aria-label="Referral program"><div class="card hero"><p class="eyebrow">Good things are better shared</p><h2>A little gift of light.</h2>
         <p>${me.offer.friend_days ? `Friends get <b>${me.offer.friend_days} days</b> free.` : ""} ${me.offer.inviter_days ? `You get <b>${me.offer.inviter_days} days</b> when they subscribe.` : ""}</p>
@@ -246,7 +248,7 @@ function render() {
         ${me.credit_days ? `<li><span>Recorded credit<br><span class="s">Automatic redemption is not available in this demo.</span></span><b>${me.credit_days} days</b></li>` : ""}
         </ul></div>` : ""}
       ${installCard()}</aside></div></main>
-      <footer class="footer"><p>Lumen studio · ${me.mode === "live" ? "live Adapty sandbox" : "offline mock"} · purchases are simulated</p><button class="ghost" id="signout">Sign out</button></footer>`;
+      <footer class="footer"><p>Lumen studio · ${me.mode === "live" ? "live Adapty sandbox" : "offline mock"} · purchases are simulated</p><button class="light" id="signout">Sign out</button></footer>`;
     $("share").addEventListener("click", share);
     $("upgrade").addEventListener("click", () => openPaywall());
     $("upload").addEventListener("click", () => $("photo-file").click());
@@ -259,7 +261,8 @@ function render() {
     $("tokens-chip")?.addEventListener("click", () => openTokens());
     if (photoImage) drawPhoto($("photo"), 1600);
     else loadSample();
-    $("signout").addEventListener("click", () => { if (confirm("Sign out? This phone will forget the account.")) { store.del("lumen_token"); store.del("lumen_ref"); location.href = "/app"; } });
+    const signOut = () => { if (confirm("Sign out? This phone will forget the account.")) { store.del("lumen_token"); store.del("lumen_ref"); location.href = "/app"; } };
+    $("signout").addEventListener("click", signOut); $("signout-top").addEventListener("click", signOut);
   }
   const ib = $("install"); if (ib) ib.addEventListener("click", async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; render(); });
 }

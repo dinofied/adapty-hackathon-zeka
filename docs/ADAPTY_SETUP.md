@@ -71,9 +71,13 @@ Integrations → Webhook: production and sandbox URL `https://lumen-referrals.on
 ## Lumen tokens (not set up yet: needs a human)
 
 Mock mode works without any of this. For live mode, in the **sandbox app only**:
-1. Products → **Virtual currency** tab → **New virtual currency**, code `TOKENS`, name "Lumen tokens".
-2. Create one-time products `lumen.demo.tokens30` and `lumen.demo.tokens100`. **Don't link them to `TOKENS`**: the server credits the tokens after recording the purchase, so a link would credit them twice.
-3. Adapty's docs say the server API for virtual currencies may have to be enabled by Adapty support (`403 feature_not_enabled`). Until it is, the app hides tokens and stays subscription-only.
+Done in the sandbox app on 8 November:
+
+1. Virtual currency `TOKENS` ("Lumen tokens"), with **no linked products**. The server credits tokens after recording a purchase, so linking a product would credit them twice.
+2. One-time products `lumen.demo.tokens30` ("Lumen tokens 30", `f044ca64-961d-4b3e-815c-57143f138372`) and `lumen.demo.tokens100` ("Lumen tokens 100", `64ba4dfc-3872-41c2-8066-2db9c2ac61f5`), period lifetime.
+3. Access level `token_pack` (`47148943-b105-46b6-9be1-1dcead40defc`) for those products, because Adapty requires one. It unlocks nothing: **never link a pack to `premium`**. The server only reads the `premium` level.
+
+The server API for virtual currencies is enabled for this app. If it returns `403 feature_not_enabled` or `unknown_currency`, the app hides tokens and retries after 5 minutes. Only new signups get welcome tokens; there's no backfill.
 
 ## Things that can't be done here
 
