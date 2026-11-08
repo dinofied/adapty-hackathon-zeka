@@ -19,10 +19,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Compile
-        run: python -m py_compile server.py adapty_client.py scripts/smoke_test.py tests/test_referrals.py
+        run: python -m py_compile server.py adapty_client.py scripts/smoke_test.py scripts/test_compatibility.py tests/test_referrals.py
       - name: Unit tests (rules engine, identity, webhook; mock Adapty)
         run: python -m unittest discover -s tests -v
+      - name: HTTP and Windows compatibility regressions (mock Adapty)
+        run: python scripts/test_compatibility.py
+      - name: Browser API regressions
+        run: node --test scripts/test_app_launch.js
       - name: Smoke test in mock mode
         env:
           PORT: "8080"

@@ -6,7 +6,8 @@
 - **iPhone:** open https://lumen-referrals.onrender.com/app in **Safari** → Share → Add to Home Screen.
 - A friend should open the **invite link in Chrome/Safari first**. On Android, download from that invitation, install, return to the invitation and tap **Open Lumen**. This passes the code directly to the wrapper (or the web fallback). The fresh invitation also survives first launch when the browser and wrapper share cookies. If they do not, enter the displayed invitation code before signup. Web installs retain it in the manifest.
 - Use a **new email** for the friend. An already-created account keeps its original attribution, including organic attribution; reinstalling does not make it a new referral or repeat rewards.
-- Opening through an invitation checks for updated web content before opening/focusing Lumen. Android package upgrades cannot be silent and are separate from web updates.
+- Web opening checks for updated content before opening/focusing Lumen. Android opens immediately to preserve the tap's user activation and checks for updates in the background. Android package upgrades cannot be silent and are separate from web updates.
+- Before merge, a human must test **Open Lumen** on an Android phone both with the APK installed and without it, and report the native launch/web fallback results in the PR. Browser API mocks do not verify Android intent handling on a device.
 
 ## Script (about 3 minutes)
 

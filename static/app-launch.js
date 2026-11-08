@@ -46,11 +46,12 @@
 
   async function openApp(raw) {
     const url = appUrl(raw);
-    const result = await checkForUpdate();
     if (/android/i.test(navigator.userAgent)) {
+      checkForUpdate();
       location.assign(androidLink(url.href));
       return;
     }
+    const result = await checkForUpdate();
     const worker = result?.registration.active;
     if (worker && typeof MessageChannel !== "undefined") {
       const channel = new MessageChannel();

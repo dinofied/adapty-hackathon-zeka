@@ -779,16 +779,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(STATIC / name, cache=name != "app-launch.js")
         if path == "/download/lumen.apk":
             headers = {}
-            if params.get("ref"):
+            if "ref" in params:
                 ref = clean_code(params["ref"])
                 try:
                     valid = ref and ref_info(ref).get("code") == ref
                 except Exception:
-                    return self._send(503, {"error": "Couldn't verify the invitation. Please try again."})
-                if not valid:
-                    return self._send(400, {"error": "Invalid invitation code."},
-                                      headers={"Set-Cookie": referral_cookie()})
-                headers["Set-Cookie"] = referral_cookie(ref)
+                    pass
+                else:
+                    headers["Set-Cookie"] = referral_cookie(ref if valid else None)
             if ENV.get("APK_URL"):
                 return self._send(302, b"", headers={"Location": ENV["APK_URL"], **headers})
             return self._file(STATIC / "lumen.apk", headers=headers)
@@ -814,8 +812,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle(lambda: app_paywall(self._me()))
         if path == "/api/app/pending-ref":
             code = None if params.get("clear") == "1" else pending_referral(self._cookie("lumen_pending_ref"))
-            return self._handle(lambda: {**ref_info(code), "how": "install"} if code else {"code": None},
-                                headers=None if code else {"Set-Cookie": referral_cookie()})
+            headers = {}
+            def find_pending():
+                info = ref_info(code) if code else {"code": None}
+                if info.get("code"):
+                    return {**info, "how": "install"}
+                headers["Set-Cookie"] = referral_cookie()
+                return {"code": None}
+            return self._handle(find_pending, headers=headers)
         if path == "/api/app/ref":
             def find():
                 code = clean_code(params.get("code")) or clean_code(self._cookie("lumen_ref"))
@@ -846,10 +850,13 @@ class Handler(BaseHTTPRequestHandler):
             def go():
                 b = self._body()
                 raw = b.get("ref") or ""
-                ref = (clean_code(raw) if raw else
-                       pending_referral(self._cookie("lumen_pending_ref")) if b.get("use_pending_ref", True) else None)
+                ref = clean_code(raw) if raw else None
                 if raw and not ref:
                     raise Problem("Enter a valid invitation code.")
+                if not raw and b.get("use_pending_ref", True):
+                    ref = pending_referral(self._cookie("lumen_pending_ref"))
+                    if ref and not profile(cuid_for_code(ref)):
+                        ref = None
                 r = signup(b.get("name", ""), b.get("email", ""), ref, (b.get("via") or ("Link" if ref else None)),
                            self.headers.get("User-Agent", ""), self._ip(), b.get("device"))
                 if ref:

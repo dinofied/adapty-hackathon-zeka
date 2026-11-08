@@ -179,9 +179,10 @@ class CompatibilityTests(unittest.TestCase):
             self.assertIn("HttpOnly", self.response_headers["Set-Cookie"])
             status, body = self.request("/api/app/pending-ref", headers={"Cookie": cookie})
             self.assertEqual(json.loads(body)["code"], code)
-            status, body = self.request("/download/lumen.apk?ref=INVALID", headers={"Cookie": cookie})
-            self.assertEqual(status, 400, body)
-            self.assertIn("Max-Age=0", self.response_headers["Set-Cookie"])
+            for invalid in ("INVALID", ""):
+                status, body = self.request("/download/lumen.apk?ref=" + invalid, headers={"Cookie": cookie})
+                self.assertEqual((status, body), (200, "mock APK"))
+                self.assertIn("Max-Age=0", self.response_headers["Set-Cookie"])
             status, _ = self.request("/r/INVALID", headers={"Cookie": cookie})
             self.assertIn("Max-Age=0", self.response_headers["Set-Cookie"])
         finally:

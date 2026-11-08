@@ -116,6 +116,20 @@ test("Android opens the installed wrapper with the code and a same-code web fall
   assert.equal(fixture.navigation.length, 1);
 });
 
+test("Android navigates in the tap's turn even when the update check stalls", async () => {
+  for (const registration of [new Promise(() => {}), { update:() => new Promise(() => {}) }]) {
+    let checks = 0;
+    const fixture = launchFixture({
+      register:() => { checks++; return Promise.resolve(registration); },
+    }, "Mozilla Android");
+    const opening = fixture.launch.openApp(link);
+    assert.equal(fixture.navigation.length, 1);
+    assert.ok(fixture.navigation[0].startsWith("intent://"));
+    assert.equal(checks, 1);
+    await opening;
+  }
+});
+
 async function workerOpen(windows, { url = link, refresh = false, failOpen = false } = {}) {
   const handlers = {}, openedUrls = [], focused = [];
   const self = {
@@ -166,26 +180,38 @@ test("worker opens a missing app and acknowledges browser refusal or invalid des
   }
 });
 
-async function appFixture({ search = "", pending = null, lookup = null, offline = false } = {}) {
-  const nodes = {}, requests = [], removed = [];
+async function appFixture({ pathname = "/app", search = "", hash = "", pending = null, lookup = null, offline = false, me = null, signupSuccess = false } = {}) {
+  const nodes = {}, requests = [], removed = [], historyChanges = [];
+  const location = { origin, pathname, search, hash, href:`${origin}${pathname}${search}${hash}` };
+  const account = me && { name:"Friend", code:"SELF-87654321", offer:{ friend_days:7, inviter_days:14 }, mode:"mock", ...me };
   const getNode = (id) => nodes[id] ||= { value:"", href:"", innerHTML:"", addEventListener() {} };
   const context = vm.createContext({
-    window:{}, navigator:{ userAgent:"Desktop" }, location:{ origin, pathname:"/app", search },
-    document:{ getElementById:getNode }, URLSearchParams, matchMedia:() => ({ matches:false }),
-    localStorage:{ getItem:(key) => key === "lumen_ref" ? "OLD-12345678" : null, removeItem:(key) => removed.push(key) },
-    addEventListener() {}, setInterval() {}, setTimeout, clearTimeout,
+    window:{}, navigator:{ userAgent:"Desktop" }, location,
+    history:{ replaceState:(_, __, value) => {
+      historyChanges.push(value);
+      const url = new URL(value, origin);
+      Object.assign(location, { href:url.href, pathname:url.pathname, search:url.search, hash:url.hash });
+    } },
+    document:{ getElementById:getNode, querySelectorAll:() => [] }, URL, URLSearchParams, matchMedia:() => ({ matches:false }),
+    localStorage:{
+      getItem:(key) => key === "lumen_ref" ? "OLD-12345678" : key === "lumen_token" && me && !signupSuccess ? "fixture-token" : null,
+      removeItem:(key) => removed.push(key), setItem() {},
+    },
+    addEventListener() {}, setInterval() {}, setTimeout, clearTimeout, Image:class {},
     fetch:async (url, options) => {
       requests.push({ url, body:options.body && JSON.parse(options.body) });
       if (url.startsWith("/api/app/ref?") && offline) throw new Error("Offline");
       const body = url === "/api/app/pending-ref" ? pending || { code:null }
-        : url.startsWith("/api/app/ref?") ? lookup || { code:null } : { error:"Signup rejected by fixture" };
-      return { ok:!options.body, json:async () => body };
+        : url.startsWith("/api/app/ref?") ? lookup || { code:null }
+        : url === "/api/app/me" ? account
+        : signupSuccess ? { token:"fixture-token", existing:false, referred_by:"Ana", actions:[] } : { error:"Signup rejected by fixture" };
+      return { ok:!options.body || signupSuccess, json:async () => body };
     },
   });
   vm.runInContext(appSource, context);
   await vm.runInContext("start()", context);
   return {
-    nodes, requests, removed,
+    nodes, requests, removed, historyChanges, location,
     async signup(code) {
       getNode("ref-code").value = code; getNode("n").value = "Friend"; getNode("e").value = "friend@example.com";
       const button = {};
@@ -212,13 +238,37 @@ test("direct visits do not consult legacy referral matching", async () => {
   assert.ok(!fixture.requests.some((request) => request.url.startsWith("/api/app/ref?") || request.url === "/api/app/ref"));
 });
 
+test("signed-in launches only warn for a different non-self invitation", async () => {
+  for (const [code, warning] of [["ana-1234abcd", false], ["self-87654321", false], ["OTHER-ABCDEF12", true]]) {
+    const fixture = await appFixture({
+      search:`?ref=${code}`, me:{ attributes:{ referred_by:"ANA-1234ABCD" } },
+    });
+    assert.equal(fixture.nodes.root.innerHTML.includes("Invitations apply to new accounts"), warning);
+  }
+});
+
+test("successful signup removes the invitation URL but preserves other parameters and the hash", async () => {
+  for (const [pathname, search] of [["/app", "?ref=ANA-1234ABCD&view=studio"], ["/r/ANA-1234ABCD", "?view=studio"]]) {
+    const fixture = await appFixture({
+      pathname, search, hash:"#photo", signupSuccess:true,
+      lookup:{ code:"ANA-1234ABCD", inviter:"Ana" }, me:{ attributes:{ referred_by:"ANA-1234ABCD" } },
+    });
+    await fixture.signup("ANA-1234ABCD");
+    assert.deepEqual(fixture.historyChanges, ["/app?view=studio#photo"]);
+    assert.equal(fixture.location.search, "?view=studio");
+    assert.equal(fixture.nodes.manifest.href, "/manifest.webmanifest");
+  }
+});
+
 test("failed, mismatched and unknown explicit lookups never silently submit an organic signup", async () => {
   for (const options of [{ offline:true }, { lookup:{ code:"OTHER-12345678", inviter:"Someone else" } }, {}]) {
     const fixture = await appFixture({ search:"?ref=ANA-1234ABCD", ...options });
     assert.ok(fixture.nodes.root.innerHTML.includes('value="ANA-1234ABCD"'));
+    assert.ok(!fixture.nodes.root.innerHTML.includes('class="banner"'));
     await fixture.signup("ANA-1234ABCD");
     assert.equal(fixture.requests.find((request) => request.body).body.ref, "ANA-1234ABCD");
     assert.ok(!fixture.requests.some((request) => request.url === "/api/app/pending-ref"));
+    assert.deepEqual(fixture.historyChanges, []);
   }
   const invalid = await appFixture({ search:"?ref=%21%21" });
   await invalid.signup("!!");
