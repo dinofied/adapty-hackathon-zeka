@@ -299,10 +299,10 @@ class AdaptyClient:
             m = self._mock_profiles.setdefault(user_id, {"attrs": {}, "access": [], "subs": [], "revenue": 0.0})
             m["revenue"] = m.get("revenue", 0.0) + p["price"]
             self._log("POST", "/server-side-api/purchase/set/transaction/", 200, f"mock: {pack_key} ({store})")
-            return True, {"mock": True}
+            return True, {"mock": True, "transaction_id": tx_id}
         status, data = self._request("POST", "/server-side-api/purchase/set/transaction/", body, user_id=user_id,
                                      platform=platform, note=f"{pack_key} ${p['price']} {store}")
-        return 200 <= status < 300, data
+        return 200 <= status < 300, {"transaction_id": tx_id, "response": data}
 
     # ---------- tokens (Adapty virtual currency) ----------
 

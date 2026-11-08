@@ -372,6 +372,23 @@ class TokenTests(unittest.TestCase):
         self.assertEqual(self.balance(self.andre), server.WELCOME_TOKENS + 25, "the cap allows one reward")
         self.assertEqual(attrs(self.andre)["referrals_paid"], 2)
 
+    def test_one_users_404_never_switches_tokens_off_for_everyone(self):
+        server.tokens_unavailable("http_404")
+        server.tokens_unavailable("http_403")
+        self.assertTrue(server.tokens_on())
+        self.assertEqual(server.token_wallet("lumen_ffffffff")["balance"], 0, "no balance yet reads as 0")
+        self.assertTrue(server.tokens_on())
+
+    def test_paid_but_not_credited_pack_is_logged_as_owed(self):
+        server.ADAPTY.change_tokens = lambda *a, **k: (False, "rate_limited")
+        with self.assertRaises(server.Problem):
+            server.buy_tokens(self.andre, "tokens_30")
+        with server.db() as c:
+            owed = c.execute("SELECT text FROM events WHERE kind = 'owed'").fetchall()
+        self.assertEqual(len(owed), 1)
+        self.assertIn("transaction", owed[0][0])
+        self.assertIn("30 tokens", owed[0][0])
+
     def test_tokens_switch_off_when_adapty_has_no_currency(self):
         server.tokens_unavailable("unknown_currency")
         self.assertIsNone(server.token_wallet(self.andre))

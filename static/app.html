@@ -308,19 +308,30 @@ async function useFeature(key) {
   }
 }
 
-function exportPhoto(maxSize) {
-  if (!photoImage) { setEditorMessage("Your photo is still loading. Try again in a moment."); return; }
-  if (recipe?.premium && !isUnlocked(recipe.key)) { recipe = null; currentEffect = "original"; render(); openPaywall("Premium effects"); return; }
-  const canvas = document.createElement("canvas");
-  drawPhoto(canvas, maxSize);
-  canvas.toBlob((blob) => {
-    if (!blob) { setEditorMessage("Export failed. Try another photo."); return; }
-    const link = document.createElement("a"), url = URL.createObjectURL(blob);
-    link.href = url; link.download = `lumen-${currentEffect}-${canvas.width}x${canvas.height}.jpg`;
-    document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setEditorMessage(`Exported ${canvas.width} × ${canvas.height}. A little moment to keep.`);
-  }, "image/jpeg", .94);
+// pay (optional): async, runs once the image is ready and before it downloads, so a failed export never
+// costs tokens. Resolves true when the photo was saved; rejects with pay's error.
+function exportPhoto(maxSize, pay = null) {
+  return new Promise((resolve, reject) => {
+    if (!photoImage) { setEditorMessage("Your photo is still loading. Try again in a moment."); return resolve(false); }
+    if (recipe?.premium && !isUnlocked(recipe.key)) {
+      const key = recipe.key, name = recipe.name;
+      recipe = null; currentEffect = "original"; render();
+      if (me.tokens) openTokens(key); else openPaywall(name);
+      return resolve(false);
+    }
+    const canvas = document.createElement("canvas");
+    drawPhoto(canvas, maxSize);
+    canvas.toBlob(async (blob) => {
+      if (!blob) { setEditorMessage(`Export failed. Try another photo.${pay ? " No tokens were used." : ""}`); return resolve(false); }
+      if (pay) { try { await pay(); } catch (err) { return reject(err); } }
+      const link = document.createElement("a"), url = URL.createObjectURL(blob);
+      link.href = url; link.download = `lumen-${currentEffect}-${canvas.width}x${canvas.height}.jpg`;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setEditorMessage(`Exported ${canvas.width} × ${canvas.height}. A little moment to keep.`);
+      resolve(true);
+    }, "image/jpeg", .94);
+  });
 }
 
 async function deviceInfo() {
@@ -420,6 +431,7 @@ async function openTokens(item = null) {
       <h1>${item ? esc(name) : "Your tokens"}</h1>
       <p>${item ? (tool ? `Use ${esc(name)} on this photo for <b>◈ ${cost} tokens</b>.` : `Export this photo at full size, up to 4096px, for <b>◈ ${cost} tokens</b>.`)
         : "Use tokens for a Premium effect on one photo, or a full-size export."} You have <b>◈ ${w.balance}</b>.</p>
+      ${tool ? `<p class="tiny" style="text-align:left;margin-top:0">Unlocked until you choose another photo or leave the page.</p>` : ""}
       ${item ? `<button class="primary" id="spend" ${enough ? "" : "disabled"}>${enough ? `Use ${cost} tokens` : `You need ${cost - w.balance} more tokens`}</button>` : ""}
       <p class="eyebrow" style="margin:22px 0 4px">Get more tokens</p>
       <div role="group" aria-label="Token packs">${w.packs.map((p) => `<button class="plan" data-pack="${esc(p.key)}"><span><b>◈ ${esc(p.label)}</b></span><span class="plan-price"><b>$${Number(p.price).toFixed(2)}</b><br><span style="font-weight:400">one-time</span></span></button>`).join("")}</div>
@@ -430,12 +442,10 @@ async function openTokens(item = null) {
     sheet.querySelector("#go-premium").addEventListener("click", () => { close(); openPaywall(name); });
     sheet.querySelector("#spend")?.addEventListener("click", async () => {
       lock(true);
+      const pay = async () => { const r = await api("/api/app/tokens/spend", { item }); if (typeof r.balance === "number") me.tokens.balance = r.balance; return r; };
       try {
-        const r = await api("/api/app/tokens/spend", { item });
-        if (typeof r.balance === "number") me.tokens.balance = r.balance;
-        close();
-        if (tool) { unlocked.add(item); recipe = tool; currentEffect = item; editorMessage = `${name} is yours for this photo. ◈ ${r.spent} tokens used.`; render(); }
-        else { render(); exportPhoto(4096); }
+        if (tool) { const r = await pay(); close(); unlocked.add(item); recipe = tool; currentEffect = item; editorMessage = `${name} is yours for this photo. ◈ ${r.spent} tokens used.`; render(); }
+        else { await exportPhoto(4096, pay); close(); render(); }  // tokens are taken only once the image is ready
       } catch (err) { message = `<p class="err">${esc(err.message)}</p>`; lock(false); draw(); }
     });
     sheet.querySelectorAll("[data-pack]").forEach((b) => b.addEventListener("click", async () => {

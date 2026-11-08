@@ -451,12 +451,15 @@ def signup(name, email, ref, via, ua, ip, client_device=None):
     event("install", f"{name} installed on {device['platform']} ({device['device']})"
           + (f" through {inviter['name']}’s link" + (f" via {via}" if via else "") if inviter else ", organic"))
     # Welcome tokens, once: this branch only runs when Adapty had no profile for this email.
-    if WELCOME_TOKENS and tokens_on():
+    if WELCOME_TOKENS and not tokens_on():
+        event("tokens", f"{name} got no welcome tokens: tokens are switched off (Adapty setup), and there is no backfill")
+    elif WELCOME_TOKENS:
         ok, res = ADAPTY.change_tokens(cuid, WELCOME_TOKENS, "welcome")
         if ok:
             event("tokens", f"{name} got {WELCOME_TOKENS} welcome tokens")
         else:
             tokens_unavailable(res)
+            event("tokens", f"{name} got no welcome tokens: Adapty said {res}")
     actions = []
     if inviter:
         program = get_program()
@@ -511,7 +514,9 @@ def tokens_on():
 
 
 def tokens_unavailable(error_code):
-    if error_code in ("feature_not_enabled", "unknown_currency", "http_403", "http_404"):
+    """Switch tokens off for everyone only on setup errors of the whole Adapty app, never on one
+    user's error (a 404 for one profile must not hide tokens from every other user)."""
+    if error_code in ("feature_not_enabled", "unknown_currency"):
         if tokens_on():
             print(f"Lumen tokens are off for 5 minutes: Adapty said {error_code}. See docs/ADAPTY_SETUP.md.", flush=True)
         _tokens_off["until"] = time.time() + 300
@@ -522,6 +527,8 @@ def token_wallet(cuid):
     if not tokens_on():
         return None
     ok, balance = ADAPTY.token_balance(cuid)
+    if not ok and balance in ("profile_not_found", "http_404"):
+        ok, balance = True, 0  # a profile that has never held tokens
     if not ok:
         tokens_unavailable(balance)
         return None
@@ -557,13 +564,16 @@ def buy_tokens(cuid, pack):
     attrs = p.get("custom_attributes") or {}
     platform = attrs.get("device_platform") or person(cuid).get("platform") or "iOS"
     pk = TOKEN_PACKS[pack]
-    ok, _ = ADAPTY.set_token_purchase(cuid, pack, platform)
+    ok, tx = ADAPTY.set_token_purchase(cuid, pack, platform)
     if not ok:
         raise Problem("Adapty didn't accept the purchase. Check the server log.")
     ok, res = ADAPTY.change_tokens(cuid, pk["tokens"], "token_pack", pack)
     if not ok:
         tokens_unavailable(res)
-        raise Problem("The purchase is recorded, but Adapty didn't add the tokens. Check the server log.")
+        # Paid but not credited: leave a record so someone can add the tokens by hand in Adapty.
+        event("owed", f"{name_of(cuid, attrs)} ({cuid}) is owed {pk['tokens']} tokens: {pk['label']} was recorded "
+              f"in Adapty (transaction {tx.get('transaction_id')}) but the credit failed ({res})")
+        raise Problem("Your purchase is recorded, but your tokens didn't arrive yet. We've noted it and will add them.")
     event("purchase", f"{name_of(cuid, attrs)} bought {pk['label']} (${pk['price']:.2f}) on "
           f"{'Google Play' if platform == 'Android' else 'App Store'}, recorded in Adapty; balance {res}")
     return {"added": pk["tokens"], "balance": res}
