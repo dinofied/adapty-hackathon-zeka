@@ -6,6 +6,20 @@
       () => { clearTimeout(timer); resolve(null); });
   });
 
+  function isInstalledApp() {
+    if (navigator.standalone === true || ["standalone", "minimal-ui", "fullscreen"].some((mode) => matchMedia(`(display-mode: ${mode})`).matches)) return true;
+    let native = false;
+    try {
+      const referrer = new URL(document.referrer);
+      native = referrer.protocol === "android-app:" && referrer.hostname === "com.lumen.referralsdemo";
+    } catch {}
+    try {
+      // Keep the wrapper context across navigation without hiding installs in other browser tabs.
+      if (native) sessionStorage.setItem("lumen_native_app", "1");
+      return native || sessionStorage.getItem("lumen_native_app") === "1";
+    } catch { return native; }
+  }
+
   function checkForUpdate() {
     if (!("serviceWorker" in navigator)) return Promise.resolve(null);
     if (updateCheck) return updateCheck;
@@ -68,5 +82,5 @@
     location.assign(url.href);
   }
 
-  window.LumenLaunch = { checkForUpdate, openApp, androidLink };
+  window.LumenLaunch = { checkForUpdate, openApp, androidLink, isInstalledApp };
 })();

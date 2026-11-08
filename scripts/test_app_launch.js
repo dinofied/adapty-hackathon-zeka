@@ -7,8 +7,12 @@ const { test } = require("node:test");
 const root = path.join(__dirname, "..", "static");
 const launchSource = fs.readFileSync(path.join(root, "app-launch.js"), "utf8");
 const workerSource = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-const appSource = [...fs.readFileSync(path.join(root, "app.html"), "utf8").matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
-  .map((match) => match[1]).join("\n");
+function inlineSource(file) {
+  return [...fs.readFileSync(path.join(root, file), "utf8").matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+    .map((match) => match[1]).join("\n");
+}
+const appSource = inlineSource("app.html");
+const inviteSource = inlineSource("invite.html").replaceAll("{{VALID}}", "1").replaceAll("{{CODE}}", "ANA-1234ABCD").replaceAll("{{APK}}", "1");
 const origin = "https://lumen-referrals.onrender.com";
 const link = `${origin}/app?ref=ANA-1234ABCD`;
 
@@ -180,24 +184,27 @@ test("worker opens a missing app and acknowledges browser refusal or invalid des
   }
 });
 
-async function appFixture({ pathname = "/app", search = "", hash = "", pending = null, lookup = null, offline = false, me = null, signupSuccess = false } = {}) {
-  const nodes = {}, requests = [], removed = [], historyChanges = [];
+async function appFixture({ pathname = "/app", search = "", hash = "", pending = null, lookup = null, offline = false, me = null, signupSuccess = false,
+  page = "app", userAgent = "Desktop", displayMode = "browser", referrer = "", iosStandalone = false, session = new Map() } = {}) {
+  const nodes = {}, requests = [], removed = [], historyChanges = [], handlers = {};
   const location = { origin, pathname, search, hash, href:`${origin}${pathname}${search}${hash}` };
   const account = me && { name:"Friend", code:"SELF-87654321", offer:{ friend_days:7, inviter_days:14 }, mode:"mock", ...me };
   const getNode = (id) => nodes[id] ||= { value:"", href:"", innerHTML:"", addEventListener() {} };
   const context = vm.createContext({
-    window:{}, navigator:{ userAgent:"Desktop" }, location,
+    window:{}, navigator:{ userAgent, standalone:iosStandalone }, location,
     history:{ replaceState:(_, __, value) => {
       historyChanges.push(value);
       const url = new URL(value, origin);
       Object.assign(location, { href:url.href, pathname:url.pathname, search:url.search, hash:url.hash });
     } },
-    document:{ getElementById:getNode, querySelectorAll:() => [] }, URL, URLSearchParams, matchMedia:() => ({ matches:false }),
+    document:{ referrer, getElementById:getNode, querySelector:() => null, querySelectorAll:() => [] }, URL, URLSearchParams,
+    matchMedia:(query) => ({ matches:query === `(display-mode: ${displayMode})` }),
+    sessionStorage:session && { getItem:(key) => session.get(key), setItem:(key, value) => session.set(key, value) },
     localStorage:{
       getItem:(key) => key === "lumen_ref" ? "OLD-12345678" : key === "lumen_token" && me && !signupSuccess ? "fixture-token" : null,
       removeItem:(key) => removed.push(key), setItem() {},
     },
-    addEventListener() {}, setInterval() {}, setTimeout, clearTimeout, Image:class {},
+    addEventListener:(type, handler) => { handlers[type] = handler; }, setInterval() {}, setTimeout, clearTimeout, Image:class {},
     fetch:async (url, options) => {
       requests.push({ url, body:options.body && JSON.parse(options.body) });
       if (url.startsWith("/api/app/ref?") && offline) throw new Error("Offline");
@@ -208,10 +215,14 @@ async function appFixture({ pathname = "/app", search = "", hash = "", pending =
       return { ok:!options.body || signupSuccess, json:async () => body };
     },
   });
-  vm.runInContext(appSource, context);
-  await vm.runInContext("start()", context);
+  vm.runInContext(launchSource, context);
+  vm.runInContext(page === "invite" ? inviteSource : appSource, context);
+  if (page === "app") await vm.runInContext("start()", context);
   return {
     nodes, requests, removed, historyChanges, location,
+    installPrompt() {
+      handlers.beforeinstallprompt({ preventDefault() {}, prompt() {}, userChoice:Promise.resolve() });
+    },
     async signup(code) {
       getNode("ref-code").value = code; getNode("n").value = "Friend"; getNode("e").value = "friend@example.com";
       const button = {};
@@ -220,6 +231,61 @@ async function appFixture({ pathname = "/app", search = "", hash = "", pending =
     },
   };
 }
+
+test("installed apps hide installation prompts on signup, in the studio and on invitations", async () => {
+  for (const options of [
+    { referrer:"android-app://com.lumen.referralsdemo" },
+    { displayMode:"standalone" }, { displayMode:"minimal-ui" }, { displayMode:"fullscreen" },
+    { userAgent:"iPhone", iosStandalone:true },
+  ]) {
+    for (const me of [null, {}]) {
+      const fixture = await appFixture({ userAgent:"Mozilla Android", ...options, me });
+      fixture.installPrompt();
+      assert.ok(!fixture.nodes.root.innerHTML.includes("Install Lumen"));
+    }
+    const invitation = await appFixture({ userAgent:"Mozilla Android", ...options, page:"invite" });
+    assert.ok(invitation.nodes.cta.innerHTML.includes('href="/app?ref=ANA-1234ABCD"'));
+    assert.ok(!/download|install|data-open-app/i.test(invitation.nodes.cta.innerHTML));
+  }
+});
+
+test("ordinary browsers retain installation and referral-aware APK download options", async () => {
+  for (const options of [
+    { userAgent:"Mozilla Android" },
+    { userAgent:"Mozilla Android", referrer:"android-app://com.lumen.referralsdemo.other" },
+    { userAgent:"iPhone" },
+  ]) {
+    const fixture = await appFixture(options);
+    fixture.installPrompt();
+    assert.ok(fixture.nodes.root.innerHTML.includes("Install Lumen"));
+    const invitation = await appFixture({ ...options, page:"invite" });
+    assert.ok(invitation.nodes.cta.innerHTML.includes("data-open-app"));
+    assert.ok(options.userAgent === "iPhone"
+      ? invitation.nodes.cta.innerHTML.includes("To install on iPhone")
+      : invitation.nodes.cta.innerHTML.includes('/download/lumen.apk?ref=ANA-1234ABCD'));
+  }
+});
+
+test("Android wrapper context survives same-tab navigation but does not mark fresh browser tabs", async () => {
+  const session = new Map();
+  await appFixture({ userAgent:"Mozilla Android", referrer:"android-app://com.lumen.referralsdemo", session });
+  const fixture = await appFixture({ userAgent:"Mozilla Android", referrer:link, session });
+  fixture.installPrompt();
+  assert.ok(!fixture.nodes.root.innerHTML.includes("Install Lumen"));
+  const invitation = await appFixture({ userAgent:"Mozilla Android", referrer:link, session, page:"invite" });
+  assert.ok(!invitation.nodes.cta.innerHTML.includes("/download/"));
+  const browser = await appFixture({ userAgent:"Mozilla Android", referrer:link, page:"invite" });
+  assert.ok(browser.nodes.cta.innerHTML.includes("/download/"));
+});
+
+test("Android wrapper detection still hides downloads when session storage is unavailable", async () => {
+  const options = { userAgent:"Mozilla Android", referrer:"android-app://com.lumen.referralsdemo", session:null };
+  const fixture = await appFixture(options);
+  fixture.installPrompt();
+  assert.ok(!fixture.nodes.root.innerHTML.includes("Install Lumen"));
+  const invitation = await appFixture({ ...options, page:"invite" });
+  assert.ok(!invitation.nodes.cta.innerHTML.includes("/download/"));
+});
 
 test("fresh install handoff pre-fills signup and keeps the code in the install manifest", async () => {
   const fixture = await appFixture({ pending:{ code:"ANA-1234ABCD", inviter:"Ana" } });

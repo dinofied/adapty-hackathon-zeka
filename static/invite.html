@@ -84,6 +84,8 @@ if (!valid) {
   document.getElementById("invite-title").textContent = "This note got lost.";
   document.getElementById("invite-intro").textContent = "This invitation is no longer available, but there’s still a place for you in the Lumen studio.";
   cta.innerHTML = `<div class="err">This invite link isn’t valid any more.</div><a class="btn second" href="/app">Open Lumen anyway</a>`;
+} else if (window.LumenLaunch?.isInstalledApp()) {
+  cta.innerHTML = `<a class="btn primary" href="${app}">Accept invitation</a>`;
 } else if (android) {
   cta.innerHTML = `<a class="btn primary" data-open-app href="${app}">Accept invitation / Open Lumen</a>`
     + (hasApk ? `<a class="btn second" href="/download/lumen.apk?ref=${encodeURIComponent(code)}">Download the Android app</a>

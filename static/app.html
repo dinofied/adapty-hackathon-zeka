@@ -184,7 +184,7 @@ async function start() {
 }
 
 function installCard() {
-  if (standalone) return "";
+  if (standalone || window.LumenLaunch?.isInstalledApp()) return "";
   if (installEvt) return `<div class="card"><h2>Install Lumen</h2><p>Add the app to your home screen.</p><button class="primary" id="install">Install app</button></div>`;
   if (isIOS) return `<div class="card"><h2>Install Lumen</h2><p>Tap <b>Share</b> <span aria-hidden="true">⎋</span> in Safari, then <b>Add to Home Screen</b>.</p></div>`;
   return "";
