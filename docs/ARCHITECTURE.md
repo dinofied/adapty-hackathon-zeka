@@ -33,7 +33,7 @@
 4. Inviter: `referrals_made += 1`, `last_referred`, `referral_status = referrer` if organic.
 5. Run the owner's `install` rules (default: friend gets 7 days premium = access-level grant).
 
-**Invite link (`GET /r/<CODE>`)**: records a click (IP, for the "same network within 2 h" fallback), `link_opens += 1` on the inviter, sets a `lumen_ref` cookie, shows per-platform install steps. The app picks the code up from `?ref=`, the manifest's `start_url`, the cookie, or the IP match, in that order. In production this would be an Adapty Attribution link with `deferred_data_sub1=<CODE>`.
+**Invite link (`GET /r/<CODE>`)**: records a click, increments `link_opens` on the inviter, sets a referral cookie, and shows per-platform install steps. The backend retains its cookie and same-IP fallback. The frontend only requests a referral for an explicit `?ref=<CODE>` from the link or the manifest's `start_url`, and verifies the returned code matches. Direct frontend visits ignore legacy cookies, saved codes and shared-IP clicks. In production this would be an Adapty Attribution link with `deferred_data_sub1=<CODE>`.
 
 **Share (`POST /api/app/share`)**: `links_shared += 1`.
 

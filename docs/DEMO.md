@@ -4,12 +4,12 @@
 
 - **Android:** open https://lumen-referrals.onrender.com/download/lumen.apk, allow installs from the browser, open Lumen. Or open `/app` in Chrome → menu → Install.
 - **iPhone:** open https://lumen-referrals.onrender.com/app in **Safari** → Share → Add to Home Screen.
-- A friend should open the **invite link in Chrome/Safari first**, then install; the code carries into the app (link, cookie, or same-network match within 2 hours).
+- A friend should open the **invite link in Chrome/Safari first**, then use its app link or install the web app; the explicit referral code carries through the link and install manifest. Opening the app directly without that code does not apply a referral.
 
 ## Script (about 3 minutes)
 
 1. **Dashboard → Program**: "The owner decides what a referral earns. These rules are stored in Adapty, as the remote config of a settings paywall."
-2. **Phone 1**: sign up → *Refer a friend* → share sheet → send.
+2. **Phone 1**: sign up → *Refer a friend* → choose a messaging app and send (if native sharing is unavailable, paste the copied link into a message).
 3. **Phone 2**: open the link → install → open. "The invite is applied; Adapty's segment *Referred users* gives them the *Referral welcome* paywall, with copy from its remote config."
 4. **Phone 2**: subscribe (demo purchase, recorded as an App Store / Google Play transaction in Adapty).
 5. **Phone 1** (pull to refresh after ~2 s): "Adapty's webhook told us the friend paid; the inviter got 14 days of premium and moved to tier bronze."
