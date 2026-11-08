@@ -287,6 +287,12 @@ test("Android wrapper detection still hides downloads when session storage is un
   assert.ok(!invitation.nodes.cta.innerHTML.includes("/download/"));
 });
 
+test("signed-in users can sign out from the top of the studio and the footer", async () => {
+  const fixture = await appFixture({ me:{} });
+  assert.ok(fixture.nodes.root.innerHTML.includes('id="signout-top"'));
+  assert.ok(fixture.nodes.root.innerHTML.includes('id="signout"'));
+});
+
 test("fresh install handoff pre-fills signup and keeps the code in the install manifest", async () => {
   const fixture = await appFixture({ pending:{ code:"ANA-1234ABCD", inviter:"Ana" } });
   assert.ok(fixture.nodes.root.innerHTML.includes('value="ANA-1234ABCD"'));
